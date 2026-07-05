@@ -94,7 +94,6 @@ export default function GlobeCanvas({
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [hovered, setHovered] = useState<CountryFeature | null>(null);
   const [ready, setReady] = useState(false);
 
   // Matte material: no specular hotspot on the oceans. The night texture is
@@ -137,21 +136,16 @@ export default function GlobeCanvas({
   }, []);
 
   const polygonAltitude = useCallback(
-    (d: object) =>
-      d === selected ? 0.02 : d === hovered ? 0.012 : 0.006,
-    [selected, hovered]
+    (d: object) => (d === selected ? 0.02 : 0.008),
+    [selected]
   );
   const polygonCapColor = useCallback(
     (d: object) =>
-      d === selected
-        ? "rgba(230, 232, 238, 0.1)"
-        : d === hovered
-          ? "rgba(230, 232, 238, 0.06)"
-          : "rgba(0, 0, 0, 0)",
-    [selected, hovered]
+      d === selected ? "rgba(255, 212, 0, 0.15)" : "rgba(0, 0, 0, 0)",
+    [selected]
   );
   const polygonStrokeColor = useCallback(
-    (d: object) => (d === selected ? "#ffd400" : "rgba(230, 232, 238, 0.25)"),
+    (d: object) => (d === selected ? "#ffd400" : "rgba(255, 255, 255, 0.3)"),
     [selected]
   );
   const polygonSideColor = useCallback(() => "rgba(0, 0, 0, 0)", []);
@@ -163,7 +157,7 @@ export default function GlobeCanvas({
     []
   );
   const handlePolygonHover = useCallback(
-    (d: object | null) => setHovered(d as CountryFeature | null),
+    () => {},
     []
   );
   const markerLat = useCallback((d: object) => (d as CountryMarker).lat, []);
@@ -187,7 +181,7 @@ export default function GlobeCanvas({
     // of canvas-center, clearing the full-right news panel. The offset is a
     // fixed angular amount (not px-based) so it holds steady across screen
     // sizes; tuned for this altitude specifically.
-    const LEFT_SHIFT_DEG = 35;
+    const LEFT_SHIFT_DEG = 0;
     globe.pointOfView(
       { lat, lng: lng + LEFT_SHIFT_DEG, altitude },
       reduceMotion ? 0 : 1000
@@ -229,6 +223,7 @@ export default function GlobeCanvas({
     // keep the 8K-textured, antialiased scene at 60fps on typical laptops.
     const dpr = Math.min(window.devicePixelRatio, 1.5);
     globe.renderer().setPixelRatio(dpr);
+    
     // The night texture is self-illuminated imagery. Ambient is kept low so
     // oceans/land stay near-black (letting the texture's own city lights
     // read as the only real color), while a soft directional "moonlight"
@@ -248,7 +243,7 @@ export default function GlobeCanvas({
 
     const controls = globe.controls();
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.35;
+    controls.autoRotateSpeed = 0.03;
     controls.enableDamping = true;
     setReady(true);
     onReady?.();
@@ -276,6 +271,7 @@ export default function GlobeCanvas({
           width={size.width}
           height={size.height}
           globeImageUrl="/textures/earth-night-8k.jpg"
+          bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
           globeMaterial={nightMaterial}
           backgroundColor="rgba(0,0,0,0)"
           showAtmosphere
@@ -296,6 +292,13 @@ export default function GlobeCanvas({
           htmlAltitude={0.012}
           htmlElement={buildMarkerElement}
           htmlElementVisibilityModifier={markerVisibility}
+          ringsData={markers}
+          ringLat={markerLat}
+          ringLng={markerLng}
+          ringColor={() => "rgba(255, 212, 0, 0.5)"}
+          ringMaxRadius={1.5}
+          ringPropagationSpeed={1.2}
+          ringRepeatPeriod={1200}
           onGlobeReady={handleReady}
           rendererConfig={{ antialias: true, alpha: true }}
         />

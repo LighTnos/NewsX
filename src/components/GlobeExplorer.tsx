@@ -10,6 +10,8 @@ import CountryCommand from "@/components/CountryCommand";
 import CustomCursor from "@/components/CustomCursor";
 import NewsFeedPanel from "@/components/NewsFeedPanel";
 import Starfield from "@/components/Starfield";
+import ScrambleText from "@/components/ScrambleText";
+import Preloader from "@/components/Preloader";
 import {
   countryCentroid,
   countryId,
@@ -17,6 +19,7 @@ import {
   loadCountries,
   type CountryFeature,
 } from "@/lib/countries";
+import type { Article } from "@/lib/news/types";
 
 gsap.registerPlugin(useGSAP, SplitText);
 
@@ -39,22 +42,17 @@ function UtcClock() {
   return <span suppressHydrationWarning>UTC {time ?? "--:--:--"}</span>;
 }
 
-const TICKER_PHRASES = [
-  "Live orbital news network",
-  "Press Ctrl K to acquire a target",
-  "All regions monitored",
-  "Signal nominal",
-];
+
 
 export default function GlobeExplorer() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const preloaderRef = useRef<HTMLDivElement>(null);
   const globeWrapRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
   const panelHeadingRef = useRef<HTMLHeadingElement>(null);
   const [countries, setCountries] = useState<CountryFeature[]>([]);
   const [selected, setSelected] = useState<CountryFeature | null>(null);
+  const [openArticle, setOpenArticle] = useState<Article | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [globeReady, setGlobeReady] = useState(false);
 
@@ -65,6 +63,8 @@ export default function GlobeExplorer() {
   // return-focus-to-trigger behavior on close.
   useEffect(() => {
     if (!selected) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpenArticle(null);
     const raf = requestAnimationFrame(() => panelHeadingRef.current?.focus());
     return () => cancelAnimationFrame(raf);
   }, [selected]);
@@ -91,11 +91,9 @@ export default function GlobeExplorer() {
         });
         gsap
           .timeline()
-          .to(preloaderRef.current, { autoAlpha: 0, duration: 0.5 })
           .to(
             globeWrapRef.current,
-            { autoAlpha: 1, scale: 1, duration: 1.4, ease: "power2.out" },
-            "-=0.1"
+            { autoAlpha: 1, scale: 1, duration: 1.4, ease: "power2.out", delay: 0.8 }
           )
           .set(heroRef.current, { autoAlpha: 1 }, "-=0.9")
           .from(
@@ -117,7 +115,6 @@ export default function GlobeExplorer() {
       });
 
       mm.add("(prefers-reduced-motion: reduce)", () => {
-        gsap.set(preloaderRef.current, { autoAlpha: 0 });
         gsap.set([globeWrapRef.current, heroRef.current, ".chrome-fade"], {
           autoAlpha: 1,
           scale: 1,
@@ -127,31 +124,48 @@ export default function GlobeExplorer() {
     { dependencies: [globeReady], scope: rootRef }
   );
 
+  useEffect(() => {
+    if (!globeReady || !heroRef.current) return;
+    if (selected) {
+      gsap.to(heroRef.current, { autoAlpha: 0, duration: 0.4 });
+    } else {
+      gsap.to(heroRef.current, { autoAlpha: 1, duration: 0.6, delay: 0.2 });
+    }
+  }, [selected, globeReady]);
+
   const coords = selected ? countryCentroid(selected) : null;
 
   return (
     <MotionConfig reducedMotion="user">
-    <div ref={rootRef} className="relative h-dvh w-full overflow-hidden">
+    <div ref={rootRef} className="relative h-dvh w-full overflow-hidden select-none">
       <CustomCursor />
       <Starfield />
 
-      {/* Faint seat glow keeping the globe from floating in a void */}
-      <div
+      {/* Dynamic ambient glow based on longitude, constrained to cohesive blues/cyans (hues 190-230) */}
+      <motion.div
         aria-hidden
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 60% 48%, rgba(150,170,210,0.09), transparent 55%)",
+        className="absolute inset-0 transition-colors duration-1000"
+        initial={{
+          background: "radial-gradient(circle at 60% 48%, rgba(76,141,255,0.08), transparent 55%)"
+        }}
+        animate={{
+          background: coords
+            ? `radial-gradient(circle at ${selected ? '35%' : '60%'} 50%, hsla(${190 + Math.floor(((coords.lng + 180) / 360) * 40)}, 70%, 50%, 0.12), transparent 60%)`
+            : "radial-gradient(circle at 60% 48%, rgba(76,141,255,0.08), transparent 55%)",
         }}
       />
 
       {/* Oversized, offset globe — cropped like an editorial spread */}
       <div
         ref={globeWrapRef}
-        className="absolute inset-0 opacity-0"
+        className="absolute inset-0 opacity-0 transition-all duration-1000 ease-in-out"
         style={{ transform: "scale(0.94)" }}
       >
-        <div className="absolute top-1/2 left-1/2 h-[110vmin] w-[110vmin] -translate-x-1/2 -translate-y-1/2 md:top-[54%] md:left-[60%]">
+        <div className={`absolute top-1/2 left-1/2 h-[100vh] w-[100vw] -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-in-out ${
+          selected
+            ? "md:top-[54%] md:left-[35%]"
+            : "md:top-[54%] md:left-[60%]"
+        }`}>
           <GlobeCanvas
             countries={countries}
             selected={selected}
@@ -161,7 +175,6 @@ export default function GlobeExplorer() {
         </div>
       </div>
 
-      <div className="grain-overlay" aria-hidden />
       <div className="vignette-overlay" aria-hidden />
 
       {/* Frame details */}
@@ -186,7 +199,7 @@ export default function GlobeExplorer() {
       {/* Header: wordmark / nav / search */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between p-6 md:px-10 md:py-6">
         <span className="chrome-fade font-display pointer-events-auto text-sm font-bold tracking-[0.35em]">
-          NEWS<span className="text-accent">X</span>
+          <ScrambleText text="NEWS" delay={600} /><span className="text-accent">X</span>
         </span>
         <div className="pointer-events-auto">
           <CountryCommand countries={countries} onSelect={setSelected} />
@@ -196,9 +209,7 @@ export default function GlobeExplorer() {
       {/* Idle instruction — hides once a country is locked in */}
       <div
         ref={heroRef}
-        className={`pointer-events-none absolute bottom-24 left-6 z-10 opacity-0 md:bottom-28 md:left-10 ${
-          selected ? "hidden md:block" : ""
-        }`}
+        className="pointer-events-none absolute bottom-24 left-6 z-10 opacity-0 md:bottom-28 md:left-10"
       >
         <p
           ref={headlineRef}
@@ -222,7 +233,7 @@ export default function GlobeExplorer() {
       {/* Selected country — structured target panel */}
       <aside
         aria-label="Selected country details"
-        className="absolute inset-x-4 bottom-14 z-10 max-h-[78vh] md:inset-x-auto md:top-24 md:right-10 md:bottom-16 md:w-95"
+        className="absolute inset-x-4 bottom-14 z-10 max-h-[78vh] md:inset-x-auto md:top-24 md:right-12 md:bottom-16 md:w-[480px]"
       >
         {error && (
           <div className="glass-panel rounded-xl p-4 text-sm text-red-300">
@@ -234,12 +245,16 @@ export default function GlobeExplorer() {
             <motion.div
               key={countryId(selected)}
               initial={{ opacity: 0, y: 28, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ 
+                opacity: openArticle ? 0 : 1, 
+                y: openArticle ? 12 : 0, 
+                scale: openArticle ? 0.98 : 1,
+              }}
               exit={{ opacity: 0, y: 12 }}
               transition={{ type: "spring", stiffness: 260, damping: 26 }}
-              className="glass-panel overflow-hidden rounded-2xl"
+              className={`glass-panel flex flex-col max-h-full overflow-hidden rounded-2xl ${openArticle ? "pointer-events-none" : ""}`}
             >
-              <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
                 <span className="font-mono text-[10px] tracking-[0.3em] text-muted uppercase">
                   Target lock
                 </span>
@@ -263,25 +278,28 @@ export default function GlobeExplorer() {
                   </svg>
                 </button>
               </div>
-              <div className="p-5">
-                <div className="h-0.5 w-10 bg-accent" />
+              <div className="flex flex-col min-h-0 p-5">
+                <div className="h-0.5 w-10 shrink-0 bg-accent" />
                 <h2
                   ref={panelHeadingRef}
                   tabIndex={-1}
-                  className="font-display mt-4 text-3xl font-medium tracking-tight outline-none"
+                  className="font-display mt-4 shrink-0 text-3xl font-medium tracking-tight outline-none"
                 >
-                  {countryName(selected)}
+                  <ScrambleText text={countryName(selected)} />
                 </h2>
-                <div className="mt-3 flex gap-5 font-mono text-[10px] tracking-[0.2em] text-muted uppercase">
+                <div className="mt-3 flex shrink-0 gap-5 font-mono text-[10px] tracking-[0.2em] text-muted uppercase">
                   <span suppressHydrationWarning>
-                    {coords ? formatCoords(coords.lat, coords.lng) : ""}
+                    {coords ? <ScrambleText text={formatCoords(coords.lat, coords.lng)} /> : ""}
                   </span>
                   <span>ID {countryId(selected)}</span>
                 </div>
-                <div className="mt-5 h-px bg-border" />
+                <div className="mt-5 h-px shrink-0 bg-border" />
                 <NewsFeedPanel
+                  key={countryId(selected)}
                   countryCode={countryId(selected)}
                   countryName={countryName(selected)}
+                  openArticle={openArticle}
+                  setOpenArticle={setOpenArticle}
                 />
               </div>
             </motion.div>
@@ -289,29 +307,9 @@ export default function GlobeExplorer() {
         </AnimatePresence>
       </aside>
 
-      {/* Mission-control HUD bar with marquee */}
-      <footer className="chrome-fade absolute inset-x-0 bottom-0 z-10 flex h-9 items-center gap-6 border-t border-border bg-background/40 px-4 font-mono text-[10px] tracking-[0.2em] text-muted uppercase backdrop-blur-md md:px-10">
+      {/* Mission-control HUD bar */}
+      <footer className="chrome-fade absolute inset-x-0 bottom-0 z-10 flex justify-between h-9 items-center gap-6 border-t border-border bg-background/40 px-4 font-mono text-[10px] tracking-[0.2em] text-muted uppercase backdrop-blur-md md:px-10">
         <UtcClock />
-        <div
-          aria-hidden
-          className="relative flex-1 overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]"
-        >
-          <div className="marquee-track gap-12">
-            {[0, 1].map((copy) => (
-              <div key={copy} className="flex shrink-0 gap-12">
-                {TICKER_PHRASES.map((phrase) => (
-                  <span key={phrase} className="whitespace-nowrap">
-                    {phrase} <span className="text-accent">//</span>
-                  </span>
-                ))}
-                <span className="whitespace-nowrap">
-                  {countries.length || "—"} regions tracked{" "}
-                  <span className="text-accent">//</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
         <span suppressHydrationWarning className="whitespace-nowrap">
           {selected && coords
             ? `${countryName(selected)} · ${formatCoords(coords.lat, coords.lng)}`
@@ -319,18 +317,8 @@ export default function GlobeExplorer() {
         </span>
       </footer>
 
-      {/* Preloader — lifts once the globe texture is ready */}
-      <div
-        ref={preloaderRef}
-        className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-5 bg-background"
-      >
-        <span className="font-display text-lg font-bold tracking-[0.45em]">
-          NEWS<span className="text-accent">X</span>
-        </span>
-        <span className="preloader-blink font-mono text-[10px] tracking-[0.4em] text-muted uppercase">
-          Initializing orbit
-        </span>
-      </div>
+      {/* Cinematic Preloader */}
+      <Preloader isReady={globeReady} />
     </div>
     </MotionConfig>
   );

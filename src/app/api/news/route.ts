@@ -14,6 +14,8 @@ const cache = new Map<string, { data: NewsResponse; expiresAt: number }>();
 
 export async function GET(request: NextRequest) {
   const country = request.nextUrl.searchParams.get("country");
+  const name = request.nextUrl.searchParams.get("name") || country;
+  const category = (request.nextUrl.searchParams.get("category") || "top").toLowerCase();
 
   if (!country || !/^[A-Za-z]{2,3}$/.test(country)) {
     return NextResponse.json(
@@ -23,7 +25,8 @@ export async function GET(request: NextRequest) {
   }
 
   const iso = country.toUpperCase();
-  const cached = cache.get(iso);
+  const cacheKey = `${iso}-${category}`;
+  const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.data);
   }
@@ -39,7 +42,7 @@ export async function GET(request: NextRequest) {
   let source: NewsResponse["source"] = "rss";
 
   try {
-    articles = await fetchNewsDataCountry(iso);
+    articles = await fetchNewsDataCountry(iso, category);
     if (articles.length >= MIN_USEFUL_RESULTS) source = "newsdata";
   } catch (err) {
     console.error(`[news] NewsData.io failed for ${iso}:`, err);
@@ -48,7 +51,7 @@ export async function GET(request: NextRequest) {
 
   if (articles.length < MIN_USEFUL_RESULTS) {
     try {
-      const rssArticles = await fetchCountryNews(iso);
+      const rssArticles = await fetchCountryNews(iso, name as string, category);
       if (rssArticles.length > articles.length) {
         articles = rssArticles;
         source = "rss";
@@ -65,12 +68,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const payload: NewsResponse = {
+  const sourceCounts: Record<string, number> = {};
+  articles.forEach(a => {
+    sourceCounts[a.source] = (sourceCounts[a.source] || 0) + 1;
+  });
+
+  const payload = {
     country: iso,
     articles,
     source,
     fetchedAt: new Date().toISOString(),
+    debug: sourceCounts
   };
-  cache.set(iso, { data: payload, expiresAt: Date.now() + CACHE_TTL_MS });
+  cache.set(cacheKey, { data: payload as NewsResponse, expiresAt: Date.now() + CACHE_TTL_MS });
   return NextResponse.json(payload);
 }

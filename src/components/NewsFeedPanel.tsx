@@ -10,6 +10,8 @@ import { useSpeech } from "@/lib/useSpeech";
 interface NewsFeedPanelProps {
   countryCode: string;
   countryName: string;
+  openArticle: Article | null;
+  setOpenArticle: (article: Article | null) => void;
 }
 
 function timeAgo(iso: string | null): string {
@@ -23,6 +25,8 @@ function timeAgo(iso: string | null): string {
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
+
+const CATEGORIES = ["top", "business", "technology", "sports", "entertainment", "health"];
 
 type State =
   | { status: "loading" }
@@ -122,19 +126,22 @@ function ListenButton({
 export default function NewsFeedPanel({
   countryCode,
   countryName,
+  openArticle,
+  setOpenArticle,
 }: NewsFeedPanelProps) {
   const [state, setState] = useState<State>({ status: "loading" });
-  const [openArticle, setOpenArticle] = useState<Article | null>(null);
+  const [category, setCategory] = useState("top");
   const speech = useSpeech();
   const listRef = useRef<HTMLDivElement>(null);
   useLenisScroll(listRef);
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ status: "loading" });
     speech.stop();
 
-    fetch(`/api/news?country=${countryCode}`)
+    fetch(`/api/news?country=${countryCode}&name=${encodeURIComponent(countryName)}&category=${category}`)
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json()).error ?? "Request failed");
         return res.json() as Promise<NewsResponse>;
@@ -153,14 +160,14 @@ export default function NewsFeedPanel({
     return () => {
       cancelled = true;
     };
-    // speech.stop is stable (see useSpeech); only countryCode should
+    // speech.stop is stable (see useSpeech); only countryCode and category should
     // re-trigger the fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countryCode]);
+  }, [countryCode, category]);
 
   return (
-    <div className="mt-5">
-      <div className="flex items-center justify-between">
+    <div className="mt-5 flex flex-col min-h-0 flex-1">
+      <div className="flex shrink-0 items-center justify-between mt-2">
         <p className="font-mono text-[10px] tracking-[0.3em] text-muted uppercase">
           Live feed
         </p>
@@ -171,7 +178,23 @@ export default function NewsFeedPanel({
         )}
       </div>
 
-      <div ref={listRef} className="mt-3 max-h-[46vh] overflow-y-auto pr-1">
+      <div className="mt-4 mb-2 flex flex-wrap gap-2 pb-2">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setCategory(cat)}
+            className={`shrink-0 rounded-full px-3 py-1 font-mono text-[9px] tracking-[0.15em] uppercase transition-colors border ${
+              category === cat
+                ? "bg-accent/20 border-accent text-accent"
+                : "bg-white/[0.02] border-border text-muted hover:text-foreground hover:border-accent/40"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      <div ref={listRef} className="mt-3 flex-1 min-h-0 overflow-y-auto pr-1">
         <div className="space-y-3">
         {state.status === "loading" && (
           <div className="space-y-3" aria-live="polite" aria-busy="true">

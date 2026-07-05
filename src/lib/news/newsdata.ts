@@ -31,12 +31,16 @@ function articleId(seed: string): string {
 async function fetchPage(
   apiKey: string,
   isoCode: string,
+  category: string,
   page: string | null
 ): Promise<NewsDataResponse> {
   const url = new URL("https://newsdata.io/api/1/latest");
   url.searchParams.set("apikey", apiKey);
   url.searchParams.set("country", isoCode.toLowerCase());
   url.searchParams.set("language", "en");
+  if (category && category !== "top") {
+    url.searchParams.set("category", category);
+  }
   url.searchParams.set("size", "10"); // NewsData.io free-tier max per request
   if (page) url.searchParams.set("page", page);
 
@@ -57,7 +61,8 @@ async function fetchPage(
 // each page (pan-regional broadcasters) — fetching just one page often left
 // too few articles to be a useful feed.
 export async function fetchNewsDataCountry(
-  isoCode: string
+  isoCode: string,
+  category: string = "top"
 ): Promise<Article[]> {
   const apiKey = process.env.NEWSDATA_API_KEY;
   if (!apiKey) return [];
@@ -67,7 +72,7 @@ export async function fetchNewsDataCountry(
   let page: string | null = null;
 
   for (let i = 0; i < MAX_PAGES; i++) {
-    const data: NewsDataResponse = await fetchPage(apiKey, isoCode, page);
+    const data: NewsDataResponse = await fetchPage(apiKey, isoCode, category, page);
     if (data.status !== "success" || !data.results) {
       if (i === 0) {
         throw new Error(data.message ?? "NewsData.io returned an error status");

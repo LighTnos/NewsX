@@ -1,14 +1,20 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { motion, useMotionValue, useSpring } from "motion/react";
 
-// Awwwards-style cursor: a precise dot that tracks instantly plus a ring
-// that lerps behind it and expands over interactive elements. Renders
-// nothing on touch devices; native cursor is suppressed via a root class.
 export default function CustomCursor() {
-  const dotRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
   const [enabled, setEnabled] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+
+  // Mouse position
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  // Smooth springs for the outer ring
+  const springX = useSpring(mouseX, { stiffness: 300, damping: 28, mass: 0.5 });
+  const springY = useSpring(mouseY, { stiffness: 300, damping: 28, mass: 0.5 });
 
   useEffect(() => {
     if (!window.matchMedia("(pointer: fine)").matches) return;
@@ -19,66 +25,62 @@ export default function CustomCursor() {
 
   useEffect(() => {
     if (!enabled) return;
-    const dot = dotRef.current;
-    const ring = ringRef.current;
-    if (!dot || !ring) return;
-
-    let x = window.innerWidth / 2;
-    let y = window.innerHeight / 2;
-    let ringX = x;
-    let ringY = y;
-    const instant = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
 
     const onMove = (e: PointerEvent) => {
-      x = e.clientX;
-      y = e.clientY;
-      dot.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
-    };
-
-    const onOver = (e: PointerEvent) => {
-      const interactive = (e.target as Element).closest?.(
-        "a, button, [role='button'], input, select, [data-cursor]"
+      // Check if hovering interactive element
+      const target = e.target as HTMLElement;
+      const interactive = target.closest(
+        "a, button, [role='button'], input, select, [data-cursor], .interactive"
       );
-      ring.style.width = ring.style.height = interactive ? "44px" : "28px";
-      ring.style.borderColor = interactive
-        ? "var(--accent)"
-        : "rgba(255, 255, 255, 0.35)";
+      
+      setIsHovering(!!interactive);
+
+      // Magnetic pull logic if hovering a button
+      if (interactive && interactive instanceof HTMLElement) {
+        const rect = interactive.getBoundingClientRect();
+        // Calculate distance from center of button
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Only magnetize small buttons
+        if (rect.width < 200 && rect.height < 60) {
+          // Pull cursor towards center of button (20% strength)
+          const pullX = e.clientX + (centerX - e.clientX) * 0.2;
+          const pullY = e.clientY + (centerY - e.clientY) * 0.2;
+          mouseX.set(pullX);
+          mouseY.set(pullY);
+          return;
+        }
+      }
+      
+      mouseX.set(e.clientX);
+      mouseY.set(e.clientY);
     };
 
-    let raf = 0;
-    const loop = () => {
-      const ease = instant ? 1 : 0.16;
-      ringX += (x - ringX) * ease;
-      ringY += (y - ringY) * ease;
-      ring.style.transform = `translate(${ringX}px, ${ringY}px) translate(-50%, -50%)`;
-      raf = requestAnimationFrame(loop);
-    };
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerover", onOver);
-    raf = requestAnimationFrame(loop);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerover", onOver);
-    };
-  }, [enabled]);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [enabled, mouseX, mouseY]);
 
   if (!enabled) return null;
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-[999]">
-      <div
-        ref={ringRef}
-        className="fixed top-0 left-0 h-7 w-7 rounded-full border transition-[width,height,border-color] duration-300"
-        style={{ borderColor: "rgba(255,255,255,0.35)" }}
+    <>
+      {/* Instant tiny center dot */}
+      <motion.div
+        className="pointer-events-none fixed top-0 left-0 z-[9999] h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white mix-blend-difference"
+        style={{ x: mouseX, y: mouseY }}
       />
-      <div
-        ref={dotRef}
-        className="fixed top-0 left-0 h-1.5 w-1.5 rounded-full bg-foreground"
+      {/* Springy outer ring */}
+      <motion.div
+        className="pointer-events-none fixed top-0 left-0 z-[9998] h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40 mix-blend-difference"
+        style={{ x: springX, y: springY }}
+        animate={{
+          scale: isHovering ? 1.6 : 1,
+          backgroundColor: isHovering ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0)",
+          borderColor: isHovering ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)"
+        }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
       />
-    </div>
+    </>
   );
 }

@@ -1,5 +1,5 @@
-import { geoCentroid } from "d3-geo";
-import type { Feature, Geometry } from "geojson";
+import { geoCentroid, geoArea } from "d3-geo";
+import type { Feature, Geometry, Polygon } from "geojson";
 
 export interface CountryProperties {
   ADMIN: string;
@@ -25,7 +25,28 @@ export function countryCentroid(feature: CountryFeature): {
   lat: number;
   lng: number;
 } {
-  const [lng, lat] = geoCentroid(feature);
+  let geometry = feature.geometry;
+  
+  if (geometry.type === "MultiPolygon") {
+    let maxArea = -1;
+    let largestPolygon: Polygon | null = null;
+    
+    // Find the largest polygon (the mainland) to prevent overseas territories 
+    // from pulling the centroid into the middle of the ocean.
+    for (const coords of geometry.coordinates) {
+      const poly: Polygon = { type: "Polygon", coordinates: coords };
+      const area = geoArea(poly);
+      if (area > maxArea) {
+        maxArea = area;
+        largestPolygon = poly;
+      }
+    }
+    if (largestPolygon) {
+      geometry = largestPolygon;
+    }
+  }
+
+  const [lng, lat] = geoCentroid(geometry);
   return { lat, lng };
 }
 
