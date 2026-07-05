@@ -59,6 +59,8 @@ export function useSpeech() {
     };
   }, []);
 
+  const speakNextChunkRef = useRef<() => void>(null);
+
   const speakNextChunk = useCallback(() => {
     const text = queueRef.current[chunkIndexRef.current];
     if (text === undefined) {
@@ -69,24 +71,23 @@ export function useSpeech() {
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    // Prioritize high-quality Neural/Premium voices if the browser provides them
-    const englishVoices = voicesRef.current.filter((v) => v.lang.startsWith("en"));
-    const bestVoice = 
-      englishVoices.find(v => v.name.includes("Natural") && v.name.includes("United Kingdom")) || // Edge Azure Neural UK
-      englishVoices.find(v => v.name.includes("Natural")) || // Edge Azure Neural US
-      englishVoices.find(v => v.name.includes("Google UK English Female")) || // Chrome High-Quality
-      englishVoices.find(v => v.name.includes("Google US English")) || // Chrome High-Quality
-      englishVoices.find(v => v.name.includes("Premium")) || // Apple Premium
-      englishVoices.find(v => v.name.includes("Siri")) || // Apple Siri
-      englishVoices[0]; // Fallback to first available English voice (Microsoft David/Zira, etc)
-      
-    if (bestVoice) utterance.voice = bestVoice;
-    utterance.rate = 1;
+    
+    // Pick a premium English voice if available, otherwise fallback
+    const voices = window.speechSynthesis.getVoices();
+    const premium = voices.find(
+      (v) =>
+        v.lang.startsWith("en") &&
+        (v.name.includes("Premium") || v.name.includes("Enhanced") || v.name.includes("Siri"))
+    );
+    if (premium) utterance.voice = premium;
+    
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
 
+    utterance.onstart = () => setStatus("speaking");
     utterance.onend = () => {
       chunkIndexRef.current += 1;
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
-      speakNextChunk();
+      speakNextChunkRef.current?.();
     };
     utterance.onerror = () => {
       setStatus("idle");
@@ -95,8 +96,11 @@ export function useSpeech() {
     };
 
     window.speechSynthesis.speak(utterance);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    speakNextChunkRef.current = speakNextChunk;
+  }, [speakNextChunk]);
 
   // `id` identifies the article/track so the UI can show which one is
   // playing. Must be called directly from a user gesture (click handler) —

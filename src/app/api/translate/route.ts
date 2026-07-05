@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Groq from "groq-sdk";
+import { rateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,21 @@ function truncate(text: string): string {
 // or blocked without notice. Groq is a real, keyed API we already hold a
 // free-tier key for (see .env), so this is the more durable choice.
 export async function POST(request: NextRequest) {
+  // Each call is a real, metered Groq request — cap per-IP usage so one
+  // client can't burn through the free-tier quota for everyone.
+  const limit = rateLimit(request, { limit: 10, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many translation requests. Please slow down." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)),
+        },
+      }
+    );
+  }
+
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

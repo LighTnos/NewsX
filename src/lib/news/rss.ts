@@ -62,6 +62,33 @@ async function fetchFeed(feed: FeedSource): Promise<Article[]> {
   }
 }
 
+// De-dupes by article id (feeds often overlap on the same wire stories) and
+// sorts newest-first, prioritizing the hyper-local Bing News feed so it
+// doesn't get drowned out by high-volume global feeds like Al Jazeera.
+// Extracted as a pure function so it's testable without mocking RSS fetches.
+export function dedupeAndSort(articles: Article[]): Article[] {
+  const seen = new Set<string>();
+  const deduped = articles.filter((a) => {
+    if (seen.has(a.id)) return false;
+    seen.add(a.id);
+    return true;
+  });
+
+  return deduped
+    .sort((a, b) => {
+      const aIsLocal = a.source === "Bing News Local";
+      const bIsLocal = b.source === "Bing News Local";
+
+      if (aIsLocal && !bIsLocal) return -1;
+      if (!aIsLocal && bIsLocal) return 1;
+
+      const timeA = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+      const timeB = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+      return timeB - timeA;
+    })
+    .slice(0, 30);
+}
+
 export async function fetchCountryNews(isoCode: string, countryName: string, category: string = "top"): Promise<Article[]> {
   const baseFeeds = feedsForCountry(isoCode);
   
@@ -83,25 +110,5 @@ export async function fetchCountryNews(isoCode: string, countryName: string, cat
 
   console.log(`[RSS] Fetched ${articles.length} total articles. Bing News count:`, articles.filter(a => a.source === "Bing News Local").length);
 
-  // De-dupe (some feeds overlap on the same wire stories) and sort newest first.
-  const seen = new Set<string>();
-  const deduped = articles.filter((a) => {
-    if (seen.has(a.id)) return false;
-    seen.add(a.id);
-    return true;
-  });
-
-  // Return most recent first, but heavily prioritize the hyper-local Bing News feed
-  // so it doesn't get drowned out by high-volume global feeds like Al Jazeera.
-  return deduped.sort((a, b) => {
-    const aIsLocal = a.source === "Bing News Local";
-    const bIsLocal = b.source === "Bing News Local";
-    
-    if (aIsLocal && !bIsLocal) return -1;
-    if (!aIsLocal && bIsLocal) return 1;
-
-    const timeA = a.publishedAt ? Date.parse(a.publishedAt) : 0;
-    const timeB = b.publishedAt ? Date.parse(b.publishedAt) : 0;
-    return timeB - timeA;
-  }).slice(0, 30);
+  return dedupeAndSort(articles);
 }

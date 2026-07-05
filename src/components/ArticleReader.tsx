@@ -2,7 +2,12 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { motion, useScroll, useTransform } from "motion/react";
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Article } from "@/lib/news/types";
 import { useLenisScroll } from "@/lib/useLenisScroll";
@@ -23,7 +28,14 @@ interface ArticleReaderProps {
 type FullTextState =
   | { status: "loading" }
   | { status: "unavailable" }
-  | { status: "ready"; text: string; html: string; byline: string | null; excerpt: string | null };
+  | {
+      status: "ready";
+      text: string;
+      html: string;
+      byline: string | null;
+      excerpt: string | null;
+      aiSummary: string | null;
+    };
 
 function timeAgo(iso: string | null): string {
   if (!iso) return "";
@@ -35,6 +47,54 @@ function timeAgo(iso: string | null): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+// Article-shaped loading placeholder shown while /api/article fetches,
+// extracts, and summarizes (a multi-second wait). Mirrors the real reader
+// layout — a summary card, then paragraph blocks with varied line widths —
+// so the wait reads as "loading this article" rather than a bare spinner.
+function ArticleSkeleton() {
+  // Deterministic line widths (no Math.random) so SSR and client agree and
+  // the shimmer doesn't reshuffle on every render.
+  const paragraphs = [
+    [96, 88, 92, 70],
+    [90, 94, 82],
+    [88, 91, 86, 78, 60],
+    [93, 84],
+  ];
+
+  return (
+    <div
+      className="animate-pulse space-y-10"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Loading full article…</span>
+
+      {/* Summary card placeholder */}
+      <div className="rounded-xl border border-accent/20 bg-accent/5 p-6">
+        <div className="mb-4 h-2.5 w-24 rounded bg-white/10" />
+        <div className="space-y-2.5">
+          <div className="h-3.5 w-full rounded bg-white/[0.06]" />
+          <div className="h-3.5 w-[92%] rounded bg-white/[0.06]" />
+          <div className="h-3.5 w-[80%] rounded bg-white/[0.06]" />
+        </div>
+      </div>
+
+      {/* Body paragraphs */}
+      {paragraphs.map((lines, p) => (
+        <div key={p} className="space-y-3">
+          {lines.map((width, i) => (
+            <div
+              key={i}
+              className="h-4 rounded bg-white/[0.04]"
+              style={{ width: `${width}%` }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // In-app reader for an article: fetches and shows the full extracted
@@ -57,11 +117,27 @@ function ArticleReaderContent({
   const bodyRef = useRef<HTMLDivElement>(null);
   useLenisScroll(bodyRef);
 
+  // Scroll-linked parallax on the hero image + headline. Disabled entirely
+  // for users who prefer reduced motion (the ranges collapse to no movement),
+  // and these are GPU-composited Motion values, so no per-frame React renders.
+  const reduceMotion = useReducedMotion();
   const { scrollY } = useScroll({ container: bodyRef });
-  const imgY = useTransform(scrollY, [0, 800], [0, 250]);
-  const headlineScale = useTransform(scrollY, [0, 300], [1, 0.8]);
-  const headlineY = useTransform(scrollY, [0, 300], [0, 40]);
-  const headlineOpacity = useTransform(scrollY, [0, 300], [1, 0.85]);
+  const imgY = useTransform(scrollY, [0, 800], reduceMotion ? [0, 0] : [0, 250]);
+  const headlineScale = useTransform(
+    scrollY,
+    [0, 300],
+    reduceMotion ? [1, 1] : [1, 0.8]
+  );
+  const headlineY = useTransform(
+    scrollY,
+    [0, 300],
+    reduceMotion ? [0, 0] : [0, 40]
+  );
+  const headlineOpacity = useTransform(
+    scrollY,
+    [0, 300],
+    reduceMotion ? [1, 1] : [1, 0.85]
+  );
 
   const [fullText, setFullText] = useState<FullTextState>({
     status: "loading",
@@ -70,22 +146,35 @@ function ArticleReaderContent({
   const [translatedText, setTranslatedText] = useState<string | null>(null);
   const [showTranslation, setShowTranslation] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
 
   useEffect(() => {
     setImageError(false);
     setTranslatedText(null);
     setShowTranslation(false);
     setIsTranslating(false);
+    setTranslateError(null);
   }, [article]);
 
   useEffect(() => {
     let cancelled = false;
     setFullText({ status: "loading" });
 
-    fetch(`/api/article?url=${encodeURIComponent(article.url)}`)
+    const params = new URLSearchParams({
+      url: article.url,
+      title: article.title,
+    });
+
+    fetch(`/api/article?${params.toString()}`)
       .then(async (res) => {
         if (!res.ok) throw new Error("extraction failed");
-        return res.json() as Promise<{ text: string; html: string; byline: string | null; excerpt: string | null }>;
+        return res.json() as Promise<{
+          text: string;
+          html: string;
+          byline: string | null;
+          excerpt: string | null;
+          aiSummary: string | null;
+        }>;
       })
       .then((data) => {
         if (!cancelled) {
@@ -95,6 +184,7 @@ function ArticleReaderContent({
             html: data.html,
             byline: data.byline,
             excerpt: data.excerpt,
+            aiSummary: data.aiSummary,
           });
         }
       })
@@ -112,7 +202,7 @@ function ArticleReaderContent({
       setShowTranslation(false);
       return;
     }
-    
+
     if (translatedText) {
       setShowTranslation(true);
       return;
@@ -121,18 +211,34 @@ function ArticleReaderContent({
     if (fullText.status !== "ready") return;
 
     setIsTranslating(true);
+    setTranslateError(null);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: fullText.text })
+        body: JSON.stringify({ text: fullText.text }),
       });
-      if (!res.ok) throw new Error("Translation failed");
-      const data = await res.json();
+      if (!res.ok) {
+        // Distinguish the failures the user can actually act on: rate-limit
+        // (wait), unconfigured key (nothing they can do), everything else.
+        if (res.status === 429) {
+          throw new Error("Too many translations — please wait a moment.");
+        }
+        if (res.status === 503) {
+          throw new Error("Translation isn't available right now.");
+        }
+        throw new Error("Couldn't translate this article. Try again.");
+      }
+      const data = (await res.json()) as { translatedText?: string };
+      if (!data.translatedText) {
+        throw new Error("Couldn't translate this article. Try again.");
+      }
       setTranslatedText(data.translatedText);
       setShowTranslation(true);
     } catch (err) {
-      console.error(err);
+      setTranslateError(
+        err instanceof Error ? err.message : "Translation failed."
+      );
     } finally {
       setIsTranslating(false);
     }
@@ -207,9 +313,11 @@ function ArticleReaderContent({
                 <div className="relative -mx-6 md:-mx-12 mt-10 mb-12 aspect-[21/9] border-y border-border/40 bg-black overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <motion.img
-                    style={{ y: imgY, scale: 1.15 }}
+                    style={{ y: imgY, scale: reduceMotion ? 1 : 1.15 }}
                     src={article.imageUrl}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     className="object-cover w-full h-full opacity-90 origin-top"
                     onError={() => setImageError(true)}
                   />
@@ -315,32 +423,45 @@ function ArticleReaderContent({
                 </div>
               </div>
 
-              {fullText.status === "loading" && (
-                <div className="space-y-4" aria-live="polite" aria-busy="true">
-                  {[0, 1, 2, 3, 4, 5].map((i) => (
-                    <div
-                      key={i}
-                      className="h-4 animate-pulse rounded bg-white/[0.03]"
-                      style={{ width: `${Math.max(60, 95 - i * 8)}%` }}
-                    />
-                  ))}
+              {translateError && (
+                <div
+                  role="alert"
+                  className="mb-8 flex items-center gap-2 rounded-lg border border-red-400/30 bg-red-400/5 px-4 py-3 text-sm text-red-300"
+                >
+                  <svg
+                    aria-hidden
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    className="shrink-0"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v4M12 16h.01" />
+                  </svg>
+                  {translateError}
                 </div>
               )}
 
+              {fullText.status === "loading" && <ArticleSkeleton />}
+
               {fullText.status === "ready" && (
                 <div className="animate-in fade-in duration-700">
-                  {article.summary && (
+                  {(fullText.aiSummary || article.summary) && (
                     <div className="mb-10 rounded-xl bg-accent/5 border border-accent/20 p-6">
                       <div className="flex items-center gap-2 mb-3">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
                           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                         </svg>
                         <span className="font-mono text-[10px] tracking-[0.2em] text-accent uppercase font-semibold">
-                          AI Summary
+                          {fullText.aiSummary ? "AI Summary" : "Summary"}
                         </span>
                       </div>
                       <p className="text-base leading-relaxed text-foreground/90 font-medium">
-                        {article.summary}
+                        {fullText.aiSummary || article.summary}
                       </p>
                     </div>
                   )}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
+import { rateLimit } from "@/lib/rateLimit";
+import { summarizeArticle } from "@/lib/news/summarize";
 
 export const runtime = "nodejs";
 
@@ -10,6 +12,7 @@ interface CachedArticle {
   html: string;
   byline: string | null;
   excerpt: string | null;
+  aiSummary: string | null;
   expiresAt: number;
 }
 const cache = new Map<string, CachedArticle>();
@@ -19,7 +22,24 @@ const cache = new Map<string, CachedArticle>();
 // sources (RSS/NewsData.io) only ever give a 1-3 sentence description —
 // this is how the app gets genuinely full article text without a paid API.
 export async function GET(request: NextRequest) {
+  // This route fetches arbitrary third-party URLs server-side (scraping,
+  // not a licensed API) — an unbounded client could hammer both our server
+  // and target news sites through it, risking our IP getting blocked.
+  const limit = rateLimit(request, { limit: 20, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many article requests. Please slow down." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)),
+        },
+      }
+    );
+  }
+
   const url = request.nextUrl.searchParams.get("url");
+  const title = request.nextUrl.searchParams.get("title") ?? "";
   if (!url) {
     return NextResponse.json(
       { error: "Missing `url` query param." },
@@ -44,6 +64,7 @@ export async function GET(request: NextRequest) {
       html: cached.html,
       byline: cached.byline,
       excerpt: cached.excerpt,
+      aiSummary: cached.aiSummary,
     });
   }
 
@@ -78,11 +99,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // One Groq call per unique article, ever — cached alongside the
+    // extracted text, so a trending story viewed by hundreds of visitors
+    // still only triggers a single summarization request.
+    const aiSummary = await summarizeArticle(title || excerpt || "", text);
+
     const payload = {
       text,
       html: articleHtml,
       byline,
       excerpt,
+      aiSummary,
     };
 
     cache.set(url, { ...payload, expiresAt: Date.now() + CACHE_TTL_MS });

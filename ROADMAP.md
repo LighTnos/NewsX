@@ -225,3 +225,19 @@ Documented for completeness only — the app must work fully and look complete w
 - "Trending now" mode: auto-rotate + auto-focus through top global stories on idle.
 - Multi-language RSS sources for genuinely local (non-English-translated) headlines per country.
 - PWA/offline shell for the UI chrome (news content still requires network).
+
+---
+
+## 10. Implementation status vs. this plan
+
+This roadmap was the *plan*. A few things landed differently in practice — see [ARCHITECTURE.md](./ARCHITECTURE.md) for the as-built details. The most important delta:
+
+**Caching & rate limiting: in-memory today, Upstash Redis is the documented upgrade.**
+This plan assumes Upstash Redis for the news cache, article/summary cache, and quota counters. As built, all of these are **in-memory `Map`s** — which is correct and sufficient for a portfolio demo, but resets on every serverless cold start / redeploy and doesn't share state across instances. The route handlers are structured so moving to Upstash Redis is a drop-in change to the get/set calls (the same contract), not a rewrite. This is the single biggest "productionization" step and is intentionally deferred rather than blocking on account setup.
+
+Other deltas from plan, all shipped:
+- Full **article text extraction** via Mozilla Readability (`/api/article`) — went beyond the planned "use the source snippet" MVP.
+- **Groq AI summarization** wired up and cached per-article (the plan had it as optional).
+- **Bing News per-country search RSS** added as the precision RSS layer — the key enabler for full-text extraction, since it exposes real publisher URLs.
+- **Bookmarks** (localStorage), **in-feed search**, **category filters**, and **translation** (Groq) added beyond the original scope.
+- **Vitest** unit tests around the load-bearing pure logic.
