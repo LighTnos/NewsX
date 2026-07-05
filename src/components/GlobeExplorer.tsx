@@ -9,6 +9,8 @@ import GlobeCanvas from "@/components/GlobeCanvas";
 import CountryCommand from "@/components/CountryCommand";
 import CustomCursor from "@/components/CustomCursor";
 import NewsFeedPanel from "@/components/NewsFeedPanel";
+import ArticleReader from "@/components/ArticleReader";
+import BookmarksPanel from "@/components/BookmarksPanel";
 import Starfield from "@/components/Starfield";
 import ScrambleText from "@/components/ScrambleText";
 import Preloader from "@/components/Preloader";
@@ -20,6 +22,8 @@ import {
   type CountryFeature,
 } from "@/lib/countries";
 import type { Article } from "@/lib/news/types";
+import { useSpeech } from "@/lib/useSpeech";
+import { useBookmarks } from "@/lib/useBookmarks";
 
 gsap.registerPlugin(useGSAP, SplitText);
 
@@ -53,8 +57,16 @@ export default function GlobeExplorer() {
   const [countries, setCountries] = useState<CountryFeature[]>([]);
   const [selected, setSelected] = useState<CountryFeature | null>(null);
   const [openArticle, setOpenArticle] = useState<Article | null>(null);
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [globeReady, setGlobeReady] = useState(false);
+  const [allowGlobeMount, setAllowGlobeMount] = useState(false);
+
+  // One speech engine and one bookmark store for the whole app, so playback
+  // and the article reader survive country switches (NewsFeedPanel remounts
+  // per country) and bookmarks are reachable even with no country selected.
+  const speech = useSpeech();
+  const { bookmarks, isBookmarked, toggleBookmark } = useBookmarks();
 
   // Move focus into the panel when a country is selected so keyboard/screen
   // reader users land somewhere meaningful instead of only getting a
@@ -141,17 +153,12 @@ export default function GlobeExplorer() {
       <CustomCursor />
       <Starfield />
 
-      {/* Dynamic ambient glow based on longitude, constrained to cohesive blues/cyans (hues 190-230) */}
-      <motion.div
-        aria-hidden
-        className="absolute inset-0 transition-colors duration-1000"
-        initial={{
-          background: "radial-gradient(circle at 60% 48%, rgba(76,141,255,0.08), transparent 55%)"
-        }}
-        animate={{
-          background: coords
-            ? `radial-gradient(circle at ${selected ? '35%' : '60%'} 50%, hsla(${190 + Math.floor(((coords.lng + 180) / 360) * 40)}, 70%, 50%, 0.12), transparent 60%)`
-            : "radial-gradient(circle at 60% 48%, rgba(76,141,255,0.08), transparent 55%)",
+      {/* Subtle, static ambient glow to prevent GPU layout trashing */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "radial-gradient(circle at 50% 50%, rgba(76,141,255,0.05), transparent 70%)"
         }}
       />
 
@@ -166,12 +173,14 @@ export default function GlobeExplorer() {
             ? "md:top-[54%] md:left-[35%]"
             : "md:top-[54%] md:left-[60%]"
         }`}>
-          <GlobeCanvas
-            countries={countries}
-            selected={selected}
-            onSelect={setSelected}
-            onReady={handleGlobeReady}
-          />
+          {allowGlobeMount && (
+            <GlobeCanvas
+              countries={countries}
+              selected={selected}
+              onSelect={setSelected}
+              onReady={handleGlobeReady}
+            />
+          )}
         </div>
       </div>
 
@@ -201,8 +210,32 @@ export default function GlobeExplorer() {
         <span className="chrome-fade font-display pointer-events-auto text-sm font-bold tracking-[0.35em]">
           <ScrambleText text="NEWS" delay={600} /><span className="text-accent">X</span>
         </span>
-        <div className="pointer-events-auto">
+        <div className="chrome-fade pointer-events-auto flex items-center gap-2">
           <CountryCommand countries={countries} onSelect={setSelected} />
+          <button
+            type="button"
+            onClick={() => setBookmarksOpen(true)}
+            aria-label={`Saved articles (${bookmarks.length})`}
+            className="glass-panel relative flex items-center gap-2 rounded-lg px-3 py-2 text-muted transition-colors hover:text-foreground"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+            {bookmarks.length > 0 && (
+              <span className="font-mono text-[11px] tracking-wider">
+                {bookmarks.length}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -215,11 +248,7 @@ export default function GlobeExplorer() {
           ref={headlineRef}
           className="chrome-fade font-mono text-[11px] tracking-[0.3em] text-muted uppercase"
         >
-          Rotate the globe or press{" "}
-          <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px] tracking-wider normal-case">
-            Ctrl K
-          </kbd>{" "}
-          to select a country
+          Tap a country or search to begin
         </p>
       </div>
 
@@ -233,7 +262,7 @@ export default function GlobeExplorer() {
       {/* Selected country — structured target panel */}
       <aside
         aria-label="Selected country details"
-        className="absolute inset-x-4 bottom-14 z-10 max-h-[78vh] md:inset-x-auto md:top-24 md:right-12 md:bottom-16 md:w-[480px]"
+        className="pointer-events-none absolute inset-x-0 top-24 bottom-9 z-10 md:inset-x-auto md:top-20 md:right-12 md:bottom-10 md:w-[480px]"
       >
         {error && (
           <div className="glass-panel rounded-xl p-4 text-sm text-red-300">
@@ -252,9 +281,9 @@ export default function GlobeExplorer() {
               }}
               exit={{ opacity: 0, y: 12 }}
               transition={{ type: "spring", stiffness: 260, damping: 26 }}
-              className={`glass-panel flex flex-col max-h-full overflow-hidden rounded-2xl ${openArticle ? "pointer-events-none" : ""}`}
+              className={`pointer-events-auto glass-panel flex h-full flex-col overflow-hidden rounded-t-3xl md:rounded-2xl ${openArticle ? "!pointer-events-none" : ""}`}
             >
-              <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
+              <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3 md:px-4 md:py-2.5">
                 <span className="font-mono text-[10px] tracking-[0.3em] text-muted uppercase">
                   Target lock
                 </span>
@@ -278,28 +307,30 @@ export default function GlobeExplorer() {
                   </svg>
                 </button>
               </div>
-              <div className="flex flex-col min-h-0 p-5">
+              <div className="flex min-h-0 flex-1 flex-col px-5 py-5 md:px-5 md:py-4">
                 <div className="h-0.5 w-10 shrink-0 bg-accent" />
                 <h2
                   ref={panelHeadingRef}
                   tabIndex={-1}
-                  className="font-display mt-4 shrink-0 text-3xl font-medium tracking-tight outline-none"
+                  className="font-display mt-3 shrink-0 text-3xl font-medium tracking-tight outline-none"
                 >
                   <ScrambleText text={countryName(selected)} />
                 </h2>
-                <div className="mt-3 flex shrink-0 gap-5 font-mono text-[10px] tracking-[0.2em] text-muted uppercase">
+                <div className="mt-2 flex shrink-0 gap-5 font-mono text-[10px] tracking-[0.2em] text-muted uppercase">
                   <span suppressHydrationWarning>
                     {coords ? <ScrambleText text={formatCoords(coords.lat, coords.lng)} /> : ""}
                   </span>
                   <span>ID {countryId(selected)}</span>
                 </div>
-                <div className="mt-5 h-px shrink-0 bg-border" />
+                <div className="mt-4 h-px shrink-0 bg-border" />
                 <NewsFeedPanel
                   key={countryId(selected)}
                   countryCode={countryId(selected)}
                   countryName={countryName(selected)}
-                  openArticle={openArticle}
                   setOpenArticle={setOpenArticle}
+                  speech={speech}
+                  isBookmarked={isBookmarked}
+                  onToggleBookmark={toggleBookmark}
                 />
               </div>
             </motion.div>
@@ -317,8 +348,38 @@ export default function GlobeExplorer() {
         </span>
       </footer>
 
-      {/* Cinematic Preloader */}
-      <Preloader isReady={globeReady} />
+      {/* Article reader — one instance at the top level so it works whether
+          opened from a country's feed or from saved articles, and survives
+          country switches (the feed panel remounts per country). */}
+      <ArticleReader
+        article={openArticle}
+        onOpenChange={(open) => {
+          if (!open) setOpenArticle(null);
+        }}
+        isSpeaking={!!openArticle && speech.activeId === openArticle.id}
+        speechStatus={speech.status}
+        supported={speech.supported}
+        onPlay={(text) => openArticle && speech.speak(openArticle.id, text)}
+        onPause={speech.pause}
+        onResume={speech.resume}
+        onStop={speech.stop}
+      />
+
+      <BookmarksPanel
+        open={bookmarksOpen}
+        onOpenChange={setBookmarksOpen}
+        bookmarks={bookmarks}
+        onOpenArticle={(article) => {
+          setBookmarksOpen(false);
+          setOpenArticle(article);
+        }}
+        onRemove={toggleBookmark}
+      />
+
+      <Preloader 
+        isReady={globeReady} 
+        onAlmostDone={() => setAllowGlobeMount(true)} 
+      />
     </div>
     </MotionConfig>
   );

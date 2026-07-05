@@ -37,7 +37,8 @@ export default function CountryCommand({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="chrome-fade glass-panel flex items-center gap-3 rounded-lg px-3.5 py-2 text-sm text-muted transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        aria-label="Search country"
+        className="chrome-fade glass-panel flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none sm:px-3.5"
       >
         <svg
           aria-hidden
@@ -52,8 +53,9 @@ export default function CountryCommand({
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-3.5-3.5" />
         </svg>
-        Search country
-        <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-muted">
+        <span className="hidden sm:inline">Search country</span>
+        {/* Keyboard hint is only meaningful with a physical keyboard */}
+        <kbd className="hidden rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-muted sm:inline">
           CTRL K
         </kbd>
       </button>

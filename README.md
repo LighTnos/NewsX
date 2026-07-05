@@ -35,7 +35,15 @@ Without these keys the app still runs: news falls back to RSS-only, and the Tran
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · `react-globe.gl` / three.js · GSAP + Lenis · Motion (Framer Motion) · Radix UI · `cmdk` · Groq SDK · `@mozilla/readability` + `jsdom`
 
-See [ROADMAP.md](./ROADMAP.md) for the full architecture, data flow, and design rationale.
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for how it works and the non-obvious problems that shaped it (the country-precision heuristic and free full-text extraction are the interesting parts), and [ROADMAP.md](./ROADMAP.md) for the original planning doc.
+
+## Testing
+
+```bash
+npm test
+```
+
+Vitest covers the pure business logic — country centroid selection, the local-source filter, feed dedup/sort, rate limiting, and the summarization fallback contract.
 
 ## Deploying
 

@@ -28,6 +28,16 @@ function articleId(seed: string): string {
   return createHash("sha1").update(seed).digest("hex").slice(0, 16);
 }
 
+// A genuinely local/national outlet is tagged to only 1-2 countries (or
+// none, if NewsData.io didn't supply the field at all). Pan-regional
+// broadcasters (e.g. a Singapore outlet tagged to 27 countries) get
+// excluded, since their stories are frequently about a *different* country
+// in their coverage region than the one requested. Extracted as a pure
+// function so it's testable without mocking `fetch`.
+export function isLocalSource(countryTags: string[] | undefined): boolean {
+  return (countryTags ?? []).length <= 2;
+}
+
 async function fetchPage(
   apiKey: string,
   isoCode: string,
@@ -88,13 +98,10 @@ export async function fetchNewsDataCountry(
     .filter((item) => item.title && item.link)
     // The `country` query param already scopes every result to the
     // requested country. The remaining precision problem is pan-regional
-    // broadcasters (e.g. a Singapore outlet tagged to 27 countries) whose
-    // stories are frequently about a *different* country in their region.
-    // Genuinely local/national outlets are tagged to only 1-2 countries —
-    // exclude anything broader as a proxy for "not actually local coverage".
-    // (NewsData.io's `country` array holds full names like "brazil", not
-    // ISO codes, so we can't name-match here — length is the only signal.)
-    .filter((item) => (item.country ?? []).length <= 2)
+    // broadcasters, filtered out by isLocalSource (NewsData.io's `country`
+    // array holds full names like "brazil", not ISO codes, so we can't
+    // name-match here — tag-count is the only signal available).
+    .filter((item) => isLocalSource(item.country))
     .map((item) => ({
       id: articleId(item.article_id ?? item.link!),
       title: item.title!.trim(),

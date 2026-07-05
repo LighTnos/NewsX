@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchCountryNews } from "@/lib/news/rss";
 import { fetchNewsDataCountry } from "@/lib/news/newsdata";
 import type { NewsResponse } from "@/lib/news/types";
+import { rateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,22 @@ const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min, matches ROADMAP §3 caching plan
 const cache = new Map<string, { data: NewsResponse; expiresAt: number }>();
 
 export async function GET(request: NextRequest) {
+  // Cache absorbs most repeat load, but a client cycling through many
+  // country/category combos could still burn NewsData.io's daily quota —
+  // cap per-IP requests as a second line of defense.
+  const limit = rateLimit(request, { limit: 60, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil((limit.resetAt - Date.now()) / 1000)),
+        },
+      }
+    );
+  }
+
   const country = request.nextUrl.searchParams.get("country");
   const name = request.nextUrl.searchParams.get("name") || country;
   const category = (request.nextUrl.searchParams.get("category") || "top").toLowerCase();

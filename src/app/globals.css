@@ -67,6 +67,14 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
     0 32px 64px rgba(0, 0, 0, 0.6);
 }
 
+@media (max-width: 768px) {
+  .glass-panel {
+    background: rgba(10, 12, 16, 0.65);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+  }
+}
+
 /* Nav links: underline grows from the left on hover */
 .nav-link {
   position: relative;
@@ -112,6 +120,25 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
 }
 .preloader-blink {
   animation: blink 1.4s ease-in-out infinite;
+}
+
+/* Liquid glass skeleton shimmer */
+@keyframes liquid-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-glass {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.015) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.015) 75%
+  );
+  background-size: 200% 100%;
+  animation: liquid-shimmer 2s infinite linear;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
 }
 
 /* Custom cursor active: suppress the native one on precise pointers */

@@ -16,11 +16,19 @@ export function useLenisScroll(ref: RefObject<HTMLElement | null>) {
       return;
     }
 
+    // Never use JS-based scrolling on mobile! It causes severe lag and touch conflicts.
+    // Native mobile scrolling (iOS momentum, Android scroll) is hardware accelerated
+    // and infinitely smoother than any JavaScript scroll engine.
+    if (window.innerWidth < 768) {
+      return;
+    }
+
     const lenis = new Lenis({
       wrapper: el,
       content: el.firstElementChild ?? el,
-      duration: 0.9,
+      lerp: 0.06, // Provides a very fluid, "liquid" momentum feel
       smoothWheel: true,
+      wheelMultiplier: 1.1,
     });
 
     let raf = 0;

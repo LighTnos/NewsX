@@ -1,58 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence, useMotionValue, animate, useTransform } from "motion/react";
 import ScrambleText from "./ScrambleText";
 
 interface PreloaderProps {
   isReady: boolean;
+  onAlmostDone?: () => void;
 }
 
-export default function Preloader({ isReady }: PreloaderProps) {
-  const [progress, setProgress] = useState(0);
+export default function Preloader({ isReady, onAlmostDone }: PreloaderProps) {
   const [shouldUnmount, setShouldUnmount] = useState(false);
+  const count = useMotionValue(0);
+  const displayProgress = useTransform(count, (latest) =>
+    Math.round(latest).toString().padStart(3, "0") + "%"
+  );
+  const widthProgress = useTransform(count, (latest) => `${latest}%`);
+  const [phase, setPhase] = useState<"initializing" | "ready">("initializing");
+
+  const onAlmostDoneRef = useRef(onAlmostDone);
+  useEffect(() => {
+    onAlmostDoneRef.current = onAlmostDone;
+  }, [onAlmostDone]);
 
   useEffect(() => {
-    // Cinematic fast count up to 99%
-    let start = 0;
-    const duration = 1200; // ms
-    const startTime = Date.now();
-    
-    const tick = () => {
-      const elapsed = Date.now() - startTime;
-      const normalized = Math.min(elapsed / duration, 1);
-      // easeOutExpo
-      const ease = normalized === 1 ? 1 : 1 - Math.pow(2, -10 * normalized);
-      start = Math.floor(ease * 99);
-      setProgress(start);
-      if (normalized < 1) {
-        requestAnimationFrame(tick);
+    // Animate to 99% quickly
+    const controls = animate(count, 99, {
+      duration: 1.2,
+      ease: "easeOut",
+      onComplete: () => {
+        if (onAlmostDoneRef.current) onAlmostDoneRef.current();
       }
-    };
-    
-    requestAnimationFrame(tick);
-  }, []);
+    });
+    return controls.stop;
+  }, [count]);
 
   useEffect(() => {
-    if (isReady && progress >= 99) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setProgress(100);
-      setTimeout(() => setShouldUnmount(true), 400); // Hold at 100% for a beat
-    } else if (isReady) {
-      // If globe is ready before counter finishes, wait for it
-      const interval = setInterval(() => {
-        setProgress(p => {
-          if (p >= 99) {
-            clearInterval(interval);
-            setTimeout(() => setShouldUnmount(true), 400);
-            return 100;
-          }
-          return p;
-        });
-      }, 50);
-      return () => clearInterval(interval);
+    if (isReady) {
+      animate(count, 100, {
+        duration: 0.3,
+        onComplete: () => {
+          setPhase("ready");
+          setTimeout(() => setShouldUnmount(true), 400);
+        }
+      });
     }
-  }, [isReady, progress]);
+  }, [isReady, count]);
 
   return (
     <AnimatePresence>
@@ -72,21 +65,19 @@ export default function Preloader({ isReady }: PreloaderProps) {
             
             <div className="flex flex-col items-center gap-4">
               <span className="font-mono text-[10px] tracking-[0.4em] text-muted uppercase">
-                {progress === 100 ? "Orbit Established" : "Initializing Orbit"}
+                {phase === "ready" ? "Orbit Established" : "Initializing Orbit"}
               </span>
               
               <div className="relative w-48 h-[1px] bg-white/10 overflow-hidden">
                 <motion.div 
                   className="absolute top-0 left-0 bottom-0 bg-accent"
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ ease: "linear", duration: 0.1 }}
+                  style={{ width: widthProgress }}
                 />
               </div>
               
-              <span className="font-mono text-sm tracking-widest text-foreground font-medium">
-                {progress.toString().padStart(3, "0")}%
-              </span>
+              <motion.span className="font-mono text-sm tracking-widest text-foreground font-medium">
+                {displayProgress}
+              </motion.span>
             </div>
           </div>
         </motion.div>

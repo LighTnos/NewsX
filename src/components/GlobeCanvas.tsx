@@ -95,6 +95,7 @@ export default function GlobeCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [ready, setReady] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Matte material: no specular hotspot on the oceans. The night texture is
   // loaded onto it by the globeImageUrl prop.
@@ -127,6 +128,7 @@ export default function GlobeCanvas({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    setIsMobile(window.innerWidth < 768);
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       setSize({ width, height });
@@ -176,7 +178,8 @@ export default function GlobeCanvas({
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
-    const altitude = 1.8;
+    const isMobile = window.innerWidth < 768;
+    const altitude = isMobile ? 3.0 : 1.8;
     // Bias the look-at target east so the selected country renders well left
     // of canvas-center, clearing the full-right news panel. The offset is a
     // fixed angular amount (not px-based) so it holds steady across screen
@@ -215,13 +218,17 @@ export default function GlobeCanvas({
     const globe = globeRef.current;
     if (!globe || initializedRef.current) return;
     initializedRef.current = true;
-    globe.pointOfView({ lat: 20, lng: 0, altitude: 2.4 }, 0);
+    const isMobile = window.innerWidth < 768;
+    const altitude = isMobile ? 4.5 : 2.4;
+    globe.pointOfView({ lat: 20, lng: 0, altitude }, 0);
     // The globe canvas is oversized (~135% of viewport) for the cropped
     // composition, so actual rendered pixels are already well above the
     // viewport's own pixel count — capping devicePixelRatio at 2 here would
     // still mean shading roughly 2x the real screen's pixels. Cap lower to
     // keep the 8K-textured, antialiased scene at 60fps on typical laptops.
-    const dpr = Math.min(window.devicePixelRatio, 1.5);
+    const dpr = window.innerWidth < 768 
+      ? Math.min(window.devicePixelRatio, 1) // strictly cap mobile to 1x DPR
+      : Math.min(window.devicePixelRatio, 1.5);
     globe.renderer().setPixelRatio(dpr);
     
     // The night texture is self-illuminated imagery. Ambient is kept low so
@@ -243,7 +250,7 @@ export default function GlobeCanvas({
 
     const controls = globe.controls();
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.03;
+    controls.autoRotateSpeed = 0.008;
     controls.enableDamping = true;
     setReady(true);
     onReady?.();
@@ -261,7 +268,7 @@ export default function GlobeCanvas({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0"
+      className="absolute inset-0 touch-none"
       role="img"
       aria-label="Interactive 3D globe. Use the country selector for keyboard access."
     >
@@ -274,9 +281,9 @@ export default function GlobeCanvas({
           bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
           globeMaterial={nightMaterial}
           backgroundColor="rgba(0,0,0,0)"
-          showAtmosphere
+          showAtmosphere={!isMobile}
           atmosphereColor="#8a94a8"
-          atmosphereAltitude={0.1}
+          atmosphereAltitude={0.15}
           polygonsData={countries}
           polygonAltitude={polygonAltitude}
           polygonCapColor={polygonCapColor}
@@ -300,7 +307,7 @@ export default function GlobeCanvas({
           ringPropagationSpeed={1.2}
           ringRepeatPeriod={1200}
           onGlobeReady={handleReady}
-          rendererConfig={{ antialias: true, alpha: true }}
+          rendererConfig={{ antialias: !isMobile, alpha: true, powerPreference: "high-performance" }}
         />
       )}
     </div>
