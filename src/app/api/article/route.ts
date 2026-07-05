@@ -5,7 +5,14 @@ import { Readability } from "@mozilla/readability";
 export const runtime = "nodejs";
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // extracted text doesn't change; cache an hour
-const cache = new Map<string, { text: string; expiresAt: number }>();
+interface CachedArticle {
+  text: string;
+  html: string;
+  byline: string | null;
+  excerpt: string | null;
+  expiresAt: number;
+}
+const cache = new Map<string, CachedArticle>();
 
 // Extracts the main readable text from a news article URL server-side,
 // using the same Readability engine behind Firefox's Reader View. Free
@@ -32,7 +39,12 @@ export async function GET(request: NextRequest) {
 
   const cached = cache.get(url);
   if (cached && cached.expiresAt > Date.now()) {
-    return NextResponse.json({ text: cached.text });
+    return NextResponse.json({
+      text: cached.text,
+      html: cached.html,
+      byline: cached.byline,
+      excerpt: cached.excerpt,
+    });
   }
 
   try {
@@ -47,13 +59,16 @@ export async function GET(request: NextRequest) {
     if (!res.ok) {
       throw new Error(`Fetch failed: ${res.status}`);
     }
-    const html = await res.text();
+    const htmlContent = await res.text();
 
-    const dom = new JSDOM(html, { url });
+    const dom = new JSDOM(htmlContent, { url });
     const article = new Readability(dom.window.document).parse();
     const text = article?.textContent?.trim();
+    const articleHtml = article?.content?.trim();
+    const byline = article?.byline?.trim() || null;
+    const excerpt = article?.excerpt?.trim() || null;
 
-    if (!text || text.length < 200) {
+    if (!text || text.length < 200 || !articleHtml) {
       // Readability succeeded but found little/nothing usable (paywall,
       // JS-rendered body, unusual layout) — let the client fall back to
       // the short summary rather than showing a near-empty reader view.
@@ -63,8 +78,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    cache.set(url, { text, expiresAt: Date.now() + CACHE_TTL_MS });
-    return NextResponse.json({ text });
+    const payload = {
+      text,
+      html: articleHtml,
+      byline,
+      excerpt,
+    };
+
+    cache.set(url, { ...payload, expiresAt: Date.now() + CACHE_TTL_MS });
+    return NextResponse.json(payload);
   } catch {
     return NextResponse.json(
       { error: "Could not fetch or parse this article." },

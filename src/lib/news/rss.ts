@@ -3,7 +3,12 @@ import { createHash } from "node:crypto";
 import { feedsForCountry, type FeedSource } from "@/lib/rssSources";
 import type { Article } from "./types";
 
-const parser = new Parser({ timeout: 8000 });
+const parser = new Parser({ 
+  timeout: 8000,
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  }
+});
 
 function articleId(url: string): string {
   return createHash("sha1").update(url).digest("hex").slice(0, 16);
@@ -29,25 +34,54 @@ async function fetchFeed(feed: FeedSource): Promise<Article[]> {
     const parsed = await parser.parseURL(feed.url);
     return parsed.items
       .filter((item) => item.link && item.title)
-      .map((item) => ({
-        id: articleId(item.link!),
-        title: stripHtml(item.title!),
-        summary: toSummary(item),
-        source: feed.name,
-        url: item.link!,
-        publishedAt: item.isoDate ?? item.pubDate ?? null,
-        imageUrl: item.enclosure?.url ?? null,
-      }));
-  } catch {
+      .map((item) => {
+        let finalUrl = item.link!;
+        try {
+          if (finalUrl.includes("bing.com/news/apiclick.aspx")) {
+            const urlParam = new URL(finalUrl).searchParams.get("url");
+            if (urlParam) finalUrl = urlParam;
+          }
+        } catch {
+          // ignore invalid URLs
+        }
+
+        return {
+          id: articleId(item.link!),
+          title: stripHtml(item.title!),
+          summary: toSummary(item),
+          source: feed.name,
+          url: finalUrl,
+          publishedAt: item.isoDate ?? item.pubDate ?? null,
+          imageUrl: item.enclosure?.url ?? null,
+        };
+      });
+  } catch (err) {
+    console.error('Failed to fetch feed:', feed.url, err);
     // One dead/slow feed shouldn't take down the whole country's results.
     return [];
   }
 }
 
-export async function fetchCountryNews(isoCode: string): Promise<Article[]> {
-  const feeds = feedsForCountry(isoCode);
-  const results = await Promise.all(feeds.map(fetchFeed));
+export async function fetchCountryNews(isoCode: string, countryName: string, category: string = "top"): Promise<Article[]> {
+  const baseFeeds = feedsForCountry(isoCode);
+  
+  // Bing News has a highly reliable search RSS endpoint that provides
+  // localized news for virtually any country name, absolutely free. 
+  // Crucially, unlike Google News, Bing includes the raw destination URL in the
+  // `url=` query param, allowing our ArticleReader to successfully extract the full text!
+  const query = category === "top" ? countryName : `${countryName} ${category}`;
+  const bingNewsFeed: FeedSource = {
+    name: "Bing News Local",
+    url: `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss`
+  };
+  
+  // If a specific topic is requested, we MUST exclude generic fallback feeds (like Al Jazeera)
+  // because they only serve general world headlines and will pollute the specific category feed.
+  const allFeeds = category === "top" ? [bingNewsFeed, ...baseFeeds] : [bingNewsFeed];
+  const results = await Promise.all(allFeeds.map(fetchFeed));
   const articles = results.flat();
+
+  console.log(`[RSS] Fetched ${articles.length} total articles. Bing News count:`, articles.filter(a => a.source === "Bing News Local").length);
 
   // De-dupe (some feeds overlap on the same wire stories) and sort newest first.
   const seen = new Set<string>();
@@ -57,11 +91,17 @@ export async function fetchCountryNews(isoCode: string): Promise<Article[]> {
     return true;
   });
 
-  deduped.sort((a, b) => {
-    const ta = a.publishedAt ? Date.parse(a.publishedAt) : 0;
-    const tb = b.publishedAt ? Date.parse(b.publishedAt) : 0;
-    return tb - ta;
-  });
+  // Return most recent first, but heavily prioritize the hyper-local Bing News feed
+  // so it doesn't get drowned out by high-volume global feeds like Al Jazeera.
+  return deduped.sort((a, b) => {
+    const aIsLocal = a.source === "Bing News Local";
+    const bIsLocal = b.source === "Bing News Local";
+    
+    if (aIsLocal && !bIsLocal) return -1;
+    if (!aIsLocal && bIsLocal) return 1;
 
-  return deduped.slice(0, 30);
+    const timeA = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+    const timeB = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+    return timeB - timeA;
+  }).slice(0, 30);
 }

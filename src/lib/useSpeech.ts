@@ -40,6 +40,7 @@ export function useSpeech() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSupported(true);
 
     const populateVoices = () => {
@@ -68,12 +69,23 @@ export function useSpeech() {
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = voicesRef.current.find((v) => v.lang.startsWith("en"));
-    if (voice) utterance.voice = voice;
+    // Prioritize high-quality Neural/Premium voices if the browser provides them
+    const englishVoices = voicesRef.current.filter((v) => v.lang.startsWith("en"));
+    const bestVoice = 
+      englishVoices.find(v => v.name.includes("Natural") && v.name.includes("United Kingdom")) || // Edge Azure Neural UK
+      englishVoices.find(v => v.name.includes("Natural")) || // Edge Azure Neural US
+      englishVoices.find(v => v.name.includes("Google UK English Female")) || // Chrome High-Quality
+      englishVoices.find(v => v.name.includes("Google US English")) || // Chrome High-Quality
+      englishVoices.find(v => v.name.includes("Premium")) || // Apple Premium
+      englishVoices.find(v => v.name.includes("Siri")) || // Apple Siri
+      englishVoices[0]; // Fallback to first available English voice (Microsoft David/Zira, etc)
+      
+    if (bestVoice) utterance.voice = bestVoice;
     utterance.rate = 1;
 
     utterance.onend = () => {
       chunkIndexRef.current += 1;
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       speakNextChunk();
     };
     utterance.onerror = () => {
@@ -83,6 +95,7 @@ export function useSpeech() {
     };
 
     window.speechSynthesis.speak(utterance);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // `id` identifies the article/track so the UI can show which one is
@@ -97,6 +110,7 @@ export function useSpeech() {
       activeIdRef.current = id;
       setActiveId(id);
       setStatus("speaking");
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       speakNextChunk();
     },
     [supported, speakNextChunk]
