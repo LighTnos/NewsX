@@ -1,9 +1,3 @@
-// Country -> RSS feed mapping. These outlets don't tag articles by country,
-// so coverage is region-level: a country gets its region's feed, falling
-// back to global "world" feeds when no closer regional feed exists.
-// All URLs verified live (BBC/Al Jazeera/France24/DW/NPR/CNN) — see ROADMAP.md §4.
-// Reuters RSS is dead (killed 2020) and intentionally excluded.
-
 export interface FeedSource {
   name: string;
   url: string;
@@ -54,16 +48,13 @@ const CNN_WORLD: FeedSource = {
   url: "http://rss.cnn.com/rss/edition_world.rss",
 };
 
-// Default feed set for any country not explicitly mapped below.
 const GLOBAL_DEFAULT: FeedSource[] = [BBC_WORLD, AL_JAZEERA];
 
 const REGION_FEEDS: Record<string, FeedSource[]> = {
-  // North America
   US: [BBC_US_CANADA, NPR, CNN_WORLD],
   CA: [BBC_US_CANADA, CNN_WORLD],
   MX: [BBC_US_CANADA, AL_JAZEERA],
 
-  // Europe
   GB: [BBC_EUROPE, BBC_WORLD],
   FR: [FRANCE24, BBC_EUROPE],
   DE: [DW, BBC_EUROPE],
@@ -85,7 +76,6 @@ const REGION_FEEDS: Record<string, FeedSource[]> = {
   GR: [BBC_EUROPE, FRANCE24],
   TR: [BBC_MIDDLE_EAST, AL_JAZEERA],
 
-  // Middle East
   IL: [BBC_MIDDLE_EAST, AL_JAZEERA],
   PS: [AL_JAZEERA, BBC_MIDDLE_EAST],
   SA: [AL_JAZEERA, BBC_MIDDLE_EAST],
@@ -99,7 +89,6 @@ const REGION_FEEDS: Record<string, FeedSource[]> = {
   YE: [AL_JAZEERA, BBC_MIDDLE_EAST],
   EG: [AL_JAZEERA, BBC_MIDDLE_EAST],
 
-  // Asia
   CN: [BBC_ASIA, AL_JAZEERA],
   JP: [BBC_ASIA],
   KR: [BBC_ASIA],
@@ -116,7 +105,6 @@ const REGION_FEEDS: Record<string, FeedSource[]> = {
   PH: [BBC_ASIA, AL_JAZEERA],
   MM: [BBC_ASIA, AL_JAZEERA],
 
-  // Africa
   ZA: [BBC_AFRICA, AL_JAZEERA],
   NG: [BBC_AFRICA, AL_JAZEERA],
   KE: [BBC_AFRICA, AL_JAZEERA],
@@ -130,11 +118,9 @@ const REGION_FEEDS: Record<string, FeedSource[]> = {
   SN: [BBC_AFRICA, FRANCE24],
   CI: [BBC_AFRICA, FRANCE24],
 
-  // Oceania
   AU: [BBC_ASIA, AL_JAZEERA],
   NZ: [BBC_ASIA],
 
-  // South America
   BR: [BBC_US_CANADA, AL_JAZEERA],
   AR: [BBC_US_CANADA, AL_JAZEERA],
   CO: [BBC_US_CANADA, AL_JAZEERA],

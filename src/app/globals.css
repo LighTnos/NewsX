@@ -28,9 +28,7 @@ html {
   color-scheme: dark;
 }
 
-/* Consistent visible focus ring for every interactive element, since the
-   dark background makes browser-default outlines easy to miss or clip
-   inside overflow-hidden containers. */
+
 a:focus-visible,
 button:focus-visible,
 [role="button"]:focus-visible,
@@ -47,7 +45,7 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* Global tactile haptic feedback on click */
+
 button, [role="button"], a, [cmdk-item] {
   transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s, color 0.2s, border-color 0.2s !important;
 }
@@ -55,7 +53,7 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   transform: scale(0.97) !important;
 }
 
-/* Apple Liquid Glass Effect */
+
 .glass-panel {
   background: rgba(10, 12, 16, 0.35);
   backdrop-filter: blur(64px) saturate(200%);
@@ -75,7 +73,7 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   }
 }
 
-/* Nav links: underline grows from the left on hover */
+
 .nav-link {
   position: relative;
 }
@@ -96,7 +94,7 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   transform: scaleX(1);
 }
 
-/* Seamless marquee: content duplicated once, track slides -50% */
+
 @keyframes marquee {
   to {
     transform: translateX(-50%);
@@ -108,7 +106,7 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   animation: marquee 45s linear infinite;
 }
 
-/* Preloader status text pulse */
+
 @keyframes blink {
   0%,
   100% {
@@ -122,7 +120,7 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   animation: blink 1.4s ease-in-out infinite;
 }
 
-/* Liquid glass skeleton shimmer */
+
 @keyframes liquid-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -141,7 +139,7 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   border-radius: 12px;
 }
 
-/* Custom cursor active: suppress the native one on precise pointers */
+
 .custom-cursor,
 .custom-cursor * {
   cursor: none !important;
@@ -154,7 +152,7 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   }
 }
 
-/* Radial vignette focusing the eye on the globe */
+
 .vignette-overlay {
   position: absolute;
   inset: 0;
@@ -166,12 +164,12 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   );
 }
 
-/* Pre-entrance state for UI chrome; the GSAP timeline fades these in */
+
 .chrome-fade {
   opacity: 0;
 }
 
-/* ---- cmdk command palette ---- */
+
 [cmdk-overlay] {
   position: fixed;
   inset: 0;
@@ -237,10 +235,10 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
   text-align: center;
 }
 
-/* Article content layout styling */
+
 .article-body {
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 1.125rem; /* 18px */
+  font-size: 1.125rem; 
   line-height: 1.8;
   color: rgba(230, 232, 238, 0.95);
 }
@@ -275,15 +273,15 @@ button:active, [role="button"]:active, a:active, [cmdk-item]:active {
 }
 
 .article-body h1 {
-  font-size: 1.875rem; /* 30px */
+  font-size: 1.875rem; 
 }
 
 .article-body h2 {
-  font-size: 1.5rem; /* 24px */
+  font-size: 1.5rem; 
 }
 
 .article-body h3 {
-  font-size: 1.25rem; /* 20px */
+  font-size: 1.25rem; 
 }
 
 .article-body ul,

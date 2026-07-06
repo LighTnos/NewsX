@@ -2,8 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-// Sparse static starfield drawn once per resize, with a gentle pointer
-// parallax on the whole canvas. No per-frame drawing cost.
 export default function Starfield() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -28,7 +26,6 @@ export default function Starfield() {
         const y = Math.random() * h;
         const r = Math.random() * 0.9 + 0.3;
         const alpha = Math.random() * 0.55 + 0.15;
-        // Occasional faint blue-white tint for depth.
         const blue = Math.random() > 0.85;
         ctx.fillStyle = blue
           ? `rgba(180, 200, 255, ${alpha})`
@@ -45,16 +42,26 @@ export default function Starfield() {
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
+    let raf = 0;
+    let px = 0;
+    let py = 0;
     const onPointerMove = (e: PointerEvent) => {
-      const dx = (e.clientX / window.innerWidth - 0.5) * -10;
-      const dy = (e.clientY / window.innerHeight - 0.5) * -10;
-      canvas.style.transform = `translate(${dx}px, ${dy}px)`;
+      px = e.clientX;
+      py = e.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const dx = (px / window.innerWidth - 0.5) * -10;
+        const dy = (py / window.innerHeight - 0.5) * -10;
+        canvas.style.transform = `translate(${dx}px, ${dy}px)`;
+      });
     };
     if (!reduceMotion) window.addEventListener("pointermove", onPointerMove);
 
     return () => {
       window.removeEventListener("resize", draw);
       window.removeEventListener("pointermove", onPointerMove);
+      if (raf) cancelAnimationFrame(raf);
     };
   }, []);
 
@@ -62,7 +69,7 @@ export default function Starfield() {
     <canvas
       ref={canvasRef}
       aria-hidden
-      className="absolute inset-0 h-full w-full transition-transform duration-700 ease-out"
+      className="absolute inset-0 h-full w-full"
     />
   );
 }

@@ -14,8 +14,6 @@ describe("summarizeArticle", () => {
   });
 
   it("returns null without throwing when no API key is configured", async () => {
-    // The caller (/api/article) always has the source's own description to
-    // fall back to — summarization must never be a hard dependency.
     const result = await summarizeArticle("Some title", "Some article body.");
     expect(result).toBeNull();
   });

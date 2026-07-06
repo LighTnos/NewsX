@@ -11,9 +11,6 @@ describe("isLocalSource", () => {
   });
 
   it("rejects a pan-regional source tagged to many countries", () => {
-    // The real-world case this exists for: a Singapore-based broadcaster
-    // tagged to ~27 countries, whose stories are frequently about a
-    // *different* country in the region than the one the user selected.
     const manyCountries = Array.from({ length: 27 }, (_, i) => `country-${i}`);
     expect(isLocalSource(manyCountries)).toBe(false);
   });

@@ -86,7 +86,7 @@ The speech engine, bookmarks store, article reader, and bookmarks panel all live
 
 Honest about what's demo-grade:
 
-- **In-memory caches and rate limits reset on every serverless cold start / redeploy.** For a portfolio demo this is fine. In production you'd move both to **Upstash Redis** (already a dependency, wired as a documented future step) so they survive restarts and work across multiple serverless instances. The route handlers are structured so this is a drop-in change to the get/set calls, not a rewrite.
+- **In-memory caches and rate limits reset on every serverless cold start / redeploy.** For a portfolio demo this is fine. In production you'd move both to **Upstash Redis** so they survive restarts and work across multiple serverless instances. The route handlers are structured so this is a drop-in change to the get/set calls, not a rewrite.
 - **Bing News search RSS and article scraping are unofficial surfaces** — no ToS or rate-limit guarantee. They work today and degrade gracefully, but they're the two dependencies most likely to need attention over time.
 - **NewsData.io's free `/latest` endpoint runs several hours behind real-time**, and its true-live `timeframe` filter is paid-only. The tradeoff chosen here is precision (genuinely per-country) over minute-freshness.
 

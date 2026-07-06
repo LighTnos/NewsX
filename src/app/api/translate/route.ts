@@ -4,20 +4,13 @@ import { rateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
-const MAX_CHARS = 6000; // keeps a single request comfortably within model context
+const MAX_CHARS = 6000;
 
 function truncate(text: string): string {
   return text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS)}…` : text;
 }
 
-// Translates article text to English via Groq's free-tier LLM API. Replaces
-// an earlier version that called Google's undocumented translate_a/single
-// endpoint — that endpoint has no key/ToS guarantee and can be rate-limited
-// or blocked without notice. Groq is a real, keyed API we already hold a
-// free-tier key for (see .env), so this is the more durable choice.
 export async function POST(request: NextRequest) {
-  // Each call is a real, metered Groq request — cap per-IP usage so one
-  // client can't burn through the free-tier quota for everyone.
   const limit = rateLimit(request, { limit: 10, windowMs: 60_000 });
   if (!limit.ok) {
     return NextResponse.json(

@@ -184,10 +184,6 @@ export default function NewsFeedPanel({
   const listRef = useRef<HTMLDivElement>(null);
   useLenisScroll(listRef);
 
-  // Filters the already-loaded feed client-side — no extra API calls, no
-  // quota risk. A genuinely global cross-country search would need
-  // NewsData.io's separate /news search endpoint, which is a bigger, riskier
-  // change (different quota, different response shape) left for later.
   const filteredArticles = useMemo(() => {
     if (state.status !== "ready") return [];
     const q = query.trim().toLowerCase();
@@ -226,8 +222,6 @@ export default function NewsFeedPanel({
     return () => {
       cancelled = true;
     };
-    // speech.stop is stable (see useSpeech); only countryCode and category should
-    // re-trigger the fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countryCode, category]);
 

@@ -39,9 +39,6 @@ describe("dedupeAndSort", () => {
   });
 
   it("prioritizes Bing News Local over other sources regardless of publish time", () => {
-    // This is deliberate: Bing's hyper-local per-country search results
-    // would otherwise get drowned out by high-volume feeds like Al Jazeera,
-    // even when Al Jazeera's story happens to be more recent.
     const newerGlobal = article({
       id: "1",
       source: "Al Jazeera",

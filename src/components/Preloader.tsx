@@ -24,7 +24,6 @@ export default function Preloader({ isReady, onAlmostDone }: PreloaderProps) {
   }, [onAlmostDone]);
 
   useEffect(() => {
-    // Animate to 99% quickly
     const controls = animate(count, 99, {
       duration: 1.2,
       ease: "easeOut",

@@ -12,8 +12,6 @@ interface BookmarksPanelProps {
   onRemove: (article: Article) => void;
 }
 
-// Saved-articles list, opened from the header. Bookmarks persist per-browser
-// via localStorage (see useBookmarks) — no accounts, no backend.
 export default function BookmarksPanel({
   open,
   onOpenChange,

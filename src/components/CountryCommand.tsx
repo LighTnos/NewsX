@@ -13,8 +13,6 @@ interface CountryCommandProps {
   onSelect: (country: CountryFeature) => void;
 }
 
-// Frosted-glass command palette (Ctrl/⌘+K) — the keyboard and screen-reader
-// path for country selection, replacing the globe's pointer-only interaction.
 export default function CountryCommand({
   countries,
   onSelect,
@@ -54,7 +52,6 @@ export default function CountryCommand({
           <path d="m20 20-3.5-3.5" />
         </svg>
         <span className="hidden sm:inline">Search country</span>
-        {/* Keyboard hint is only meaningful with a physical keyboard */}
         <kbd className="hidden rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-muted sm:inline">
           CTRL K
         </kbd>

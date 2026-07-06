@@ -4,9 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type SpeechStatus = "idle" | "speaking" | "paused";
 
-// Chrome silently cuts off long utterances (~200-250 chars / ~15s). Splitting
-// on sentence boundaries and queuing each as its own utterance sidesteps
-// that limit and gives natural pause points for free.
 function splitIntoChunks(text: string): string[] {
   const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
   const chunks: string[] = [];
@@ -24,9 +21,6 @@ function splitIntoChunks(text: string): string[] {
   return chunks;
 }
 
-// Wraps window.speechSynthesis for one "track" (a single article's text) at
-// a time. Handles: SSR guard, the getVoices() async-populate race, Chrome's
-// long-utterance cutoff (via chunking), and tab-visibility throttling.
 export function useSpeech() {
   const [supported, setSupported] = useState(false);
   const [status, setStatus] = useState<SpeechStatus>("idle");
@@ -47,8 +41,6 @@ export function useSpeech() {
       voicesRef.current = window.speechSynthesis.getVoices();
     };
     populateVoices();
-    // Some browsers populate voices synchronously, others fire this event
-    // asynchronously later — cover both.
     window.speechSynthesis.addEventListener("voiceschanged", populateVoices);
     return () => {
       window.speechSynthesis.removeEventListener(
@@ -72,7 +64,6 @@ export function useSpeech() {
 
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Pick a premium English voice if available, otherwise fallback
     const voices = window.speechSynthesis.getVoices();
     const premium = voices.find(
       (v) =>
@@ -102,9 +93,6 @@ export function useSpeech() {
     speakNextChunkRef.current = speakNextChunk;
   }, [speakNextChunk]);
 
-  // `id` identifies the article/track so the UI can show which one is
-  // playing. Must be called directly from a user gesture (click handler) —
-  // iOS Safari silently drops speak() calls made outside that call stack.
   const speak = useCallback(
     (id: string, text: string) => {
       if (!supported) return;
@@ -140,8 +128,6 @@ export function useSpeech() {
     activeIdRef.current = null;
   }, [supported]);
 
-  // Resume playback if the tab regains focus mid-utterance after the
-  // browser throttled/paused synthesis while backgrounded.
   useEffect(() => {
     if (!supported) return;
     const onVisibility = () => {

@@ -6,7 +6,7 @@ import { summarizeArticle } from "@/lib/news/summarize";
 
 export const runtime = "nodejs";
 
-const CACHE_TTL_MS = 60 * 60 * 1000; // extracted text doesn't change; cache an hour
+const CACHE_TTL_MS = 60 * 60 * 1000;
 interface CachedArticle {
   text: string;
   html: string;
@@ -17,14 +17,7 @@ interface CachedArticle {
 }
 const cache = new Map<string, CachedArticle>();
 
-// Extracts the main readable text from a news article URL server-side,
-// using the same Readability engine behind Firefox's Reader View. Free
-// sources (RSS/NewsData.io) only ever give a 1-3 sentence description —
-// this is how the app gets genuinely full article text without a paid API.
 export async function GET(request: NextRequest) {
-  // This route fetches arbitrary third-party URLs server-side (scraping,
-  // not a licensed API) — an unbounded client could hammer both our server
-  // and target news sites through it, risking our IP getting blocked.
   const limit = rateLimit(request, { limit: 20, windowMs: 60_000 });
   if (!limit.ok) {
     return NextResponse.json(
@@ -72,7 +65,6 @@ export async function GET(request: NextRequest) {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
       headers: {
-        // Some sites block requests with no browser-like UA at all.
         "User-Agent":
           "Mozilla/5.0 (compatible; NewsXBot/1.0; +https://github.com)",
       },
@@ -90,18 +82,12 @@ export async function GET(request: NextRequest) {
     const excerpt = article?.excerpt?.trim() || null;
 
     if (!text || text.length < 200 || !articleHtml) {
-      // Readability succeeded but found little/nothing usable (paywall,
-      // JS-rendered body, unusual layout) — let the client fall back to
-      // the short summary rather than showing a near-empty reader view.
       return NextResponse.json(
         { error: "No readable article content found." },
         { status: 422 }
       );
     }
 
-    // One Groq call per unique article, ever — cached alongside the
-    // extracted text, so a trending story viewed by hundreds of visitors
-    // still only triggers a single summarization request.
     const aiSummary = await summarizeArticle(title || excerpt || "", text);
 
     const payload = {

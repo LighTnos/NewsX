@@ -21,8 +21,6 @@ function stripHtml(input: string): string {
     .trim();
 }
 
-// Enough to read as a summary card without being the raw HTML-laden
-// <description> some feeds ship (e.g. embedded <img> tags, extra whitespace).
 function toSummary(item: Parser.Item): string {
   const raw = item.contentSnippet || item.summary || item.content || "";
   const text = stripHtml(raw);
@@ -42,7 +40,6 @@ async function fetchFeed(feed: FeedSource): Promise<Article[]> {
             if (urlParam) finalUrl = urlParam;
           }
         } catch {
-          // ignore invalid URLs
         }
 
         return {
@@ -57,15 +54,10 @@ async function fetchFeed(feed: FeedSource): Promise<Article[]> {
       });
   } catch (err) {
     console.error('Failed to fetch feed:', feed.url, err);
-    // One dead/slow feed shouldn't take down the whole country's results.
     return [];
   }
 }
 
-// De-dupes by article id (feeds often overlap on the same wire stories) and
-// sorts newest-first, prioritizing the hyper-local Bing News feed so it
-// doesn't get drowned out by high-volume global feeds like Al Jazeera.
-// Extracted as a pure function so it's testable without mocking RSS fetches.
 export function dedupeAndSort(articles: Article[]): Article[] {
   const seen = new Set<string>();
   const deduped = articles.filter((a) => {
@@ -92,18 +84,12 @@ export function dedupeAndSort(articles: Article[]): Article[] {
 export async function fetchCountryNews(isoCode: string, countryName: string, category: string = "top"): Promise<Article[]> {
   const baseFeeds = feedsForCountry(isoCode);
   
-  // Bing News has a highly reliable search RSS endpoint that provides
-  // localized news for virtually any country name, absolutely free. 
-  // Crucially, unlike Google News, Bing includes the raw destination URL in the
-  // `url=` query param, allowing our ArticleReader to successfully extract the full text!
   const query = category === "top" ? countryName : `${countryName} ${category}`;
   const bingNewsFeed: FeedSource = {
     name: "Bing News Local",
     url: `https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss`
   };
   
-  // If a specific topic is requested, we MUST exclude generic fallback feeds (like Al Jazeera)
-  // because they only serve general world headlines and will pollute the specific category feed.
   const allFeeds = category === "top" ? [bingNewsFeed, ...baseFeeds] : [bingNewsFeed];
   const results = await Promise.all(allFeeds.map(fetchFeed));
   const articles = results.flat();

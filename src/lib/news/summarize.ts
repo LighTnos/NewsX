@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
 
-const MAX_INPUT_CHARS = 8000; // keeps the summarization call within model context
+const MAX_INPUT_CHARS = 8000;
 
 function truncate(text: string): string {
   return text.length > MAX_INPUT_CHARS
@@ -8,10 +8,6 @@ function truncate(text: string): string {
     : text;
 }
 
-// Generates a short (2-3 sentence) summary of a full article via Groq's
-// free-tier LLM API. Returns null (never throws) on any failure — the
-// caller always has the source's own description to fall back to, so a
-// summarization failure should never break the article reader.
 export async function summarizeArticle(
   title: string,
   fullText: string

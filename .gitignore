@@ -40,6 +40,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# claude code session state (local machine only, not shared repo state)
-.claude/scheduled_tasks.lock

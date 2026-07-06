@@ -27,12 +27,10 @@ export default function ScrambleText({ text, className = "", delay = 0 }: Scramb
         let complete = 0;
 
         for (let i = 0; i < length; i++) {
-          // Uncover letters gradually from left to right based on frame count
           if (frame >= i * 2) {
             output += text[i];
             complete++;
           } else {
-            // Random characters for scrambled part
             output += CHARS[Math.floor(Math.random() * CHARS.length)];
           }
         }
@@ -51,7 +49,6 @@ export default function ScrambleText({ text, className = "", delay = 0 }: Scramb
     };
 
     if (delay > 0) {
-      // Just show scramble right away if delayed, but don't resolve yet
       const initialScramble = Array.from({ length })
         .map(() => CHARS[Math.floor(Math.random() * CHARS.length)])
         .join("");

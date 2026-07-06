@@ -5,14 +5,8 @@ interface Bucket {
   resetAt: number;
 }
 
-// Per-IP sliding-window-ish rate limiter, in-memory. Resets on redeploy/cold
-// start — that's an accepted tradeoff for a portfolio project (see
-// ROADMAP.md's "future upgrades" section for the Upstash Redis version that
-// would survive restarts and work across multiple server instances).
 const buckets = new Map<string, Bucket>();
 
-// Periodically drop expired buckets so this Map can't grow unbounded over a
-// long-lived server process.
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 let lastSweep = Date.now();
 function sweep() {
@@ -25,9 +19,6 @@ function sweep() {
 }
 
 function clientIp(request: NextRequest): string {
-  // Vercel/most proxies set x-forwarded-for; fall back to a constant so
-  // local dev (no proxy) still gets a single shared bucket rather than
-  // throwing.
   const forwarded = request.headers.get("x-forwarded-for");
   return forwarded?.split(",")[0]?.trim() || "local";
 }
@@ -38,7 +29,6 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
-/** Returns { ok: false } once `limit` requests have been made by this IP within `windowMs`. */
 export function rateLimit(
   request: NextRequest,
   { limit, windowMs }: { limit: number; windowMs: number }

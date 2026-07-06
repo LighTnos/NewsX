@@ -49,13 +49,7 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-// Article-shaped loading placeholder shown while /api/article fetches,
-// extracts, and summarizes (a multi-second wait). Mirrors the real reader
-// layout — a summary card, then paragraph blocks with varied line widths —
-// so the wait reads as "loading this article" rather than a bare spinner.
 function ArticleSkeleton() {
-  // Deterministic line widths (no Math.random) so SSR and client agree and
-  // the shimmer doesn't reshuffle on every render.
   const paragraphs = [
     [96, 88, 92, 70],
     [90, 94, 82],
@@ -71,7 +65,6 @@ function ArticleSkeleton() {
     >
       <span className="sr-only">Loading full article…</span>
 
-      {/* Summary card placeholder */}
       <div className="rounded-xl border border-accent/20 bg-accent/5 p-6">
         <div className="mb-4 h-2.5 w-24 rounded bg-white/10" />
         <div className="space-y-2.5">
@@ -81,7 +74,6 @@ function ArticleSkeleton() {
         </div>
       </div>
 
-      {/* Body paragraphs */}
       {paragraphs.map((lines, p) => (
         <div key={p} className="space-y-3">
           {lines.map((width, i) => (
@@ -97,11 +89,6 @@ function ArticleSkeleton() {
   );
 }
 
-// In-app reader for an article: fetches and shows the full extracted
-// article text (via /api/article, server-side Readability extraction) so
-// reading happens entirely on NewsX — no link out to the source. Falls back
-// to the short summary when extraction fails (paywalls, JS-heavy sites).
-// Sub-component to ensure bodyRef is always mounted when useScroll is called
 function ArticleReaderContent({
   article,
   isSpeaking,
@@ -117,9 +104,6 @@ function ArticleReaderContent({
   const bodyRef = useRef<HTMLDivElement>(null);
   useLenisScroll(bodyRef);
 
-  // Scroll-linked parallax on the hero image + headline. Disabled entirely
-  // for users who prefer reduced motion (the ranges collapse to no movement),
-  // and these are GPU-composited Motion values, so no per-frame React renders.
   const reduceMotion = useReducedMotion();
   const { scrollY } = useScroll({ container: bodyRef });
   const imgY = useTransform(scrollY, [0, 800], reduceMotion ? [0, 0] : [0, 250]);
@@ -219,8 +203,6 @@ function ArticleReaderContent({
         body: JSON.stringify({ text: fullText.text }),
       });
       if (!res.ok) {
-        // Distinguish the failures the user can actually act on: rate-limit
-        // (wait), unconfigured key (nothing they can do), everything else.
         if (res.status === 429) {
           throw new Error("Too many translations — please wait a moment.");
         }
@@ -308,10 +290,8 @@ function ArticleReaderContent({
                 {article.summary || `Read full article from ${article.source}`}
               </Dialog.Description>
 
-              {/* Article Image Banner - edge to edge */}
               {article.imageUrl && !imageError && (
                 <div className="relative -mx-6 md:-mx-12 mt-10 mb-12 aspect-[21/9] border-y border-border/40 bg-black overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <motion.img
                     style={{ y: imgY, scale: reduceMotion ? 1 : 1.15 }}
                     src={article.imageUrl}
