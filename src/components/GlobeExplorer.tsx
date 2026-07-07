@@ -46,8 +46,6 @@ function UtcClock() {
   return <span suppressHydrationWarning>UTC {time ?? "--:--:--"}</span>;
 }
 
-
-
 export default function GlobeExplorer() {
   const rootRef = useRef<HTMLDivElement>(null);
   const globeWrapRef = useRef<HTMLDivElement>(null);
@@ -62,17 +60,9 @@ export default function GlobeExplorer() {
   const [globeReady, setGlobeReady] = useState(false);
   const [allowGlobeMount, setAllowGlobeMount] = useState(false);
 
-  // One speech engine and one bookmark store for the whole app, so playback
-  // and the article reader survive country switches (NewsFeedPanel remounts
-  // per country) and bookmarks are reachable even with no country selected.
   const speech = useSpeech();
   const { bookmarks, isBookmarked, toggleBookmark } = useBookmarks();
 
-  // Move focus into the panel when a country is selected so keyboard/screen
-  // reader users land somewhere meaningful instead of only getting a
-  // silent visual change (mirrors what a route change would do). Deferred a
-  // frame so it reliably wins against the command palette's own
-  // return-focus-to-trigger behavior on close.
   useEffect(() => {
     if (!selected) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -89,8 +79,6 @@ export default function GlobeExplorer() {
 
   const handleGlobeReady = useCallback(() => setGlobeReady(true), []);
 
-  // Entrance: preloader lifts, globe scales/fades in, headline reveals word
-  // by word, then UI chrome fades up. Reduced motion snaps to final state.
   useGSAP(
     () => {
       if (!globeReady) return;
@@ -150,10 +138,9 @@ export default function GlobeExplorer() {
   return (
     <MotionConfig reducedMotion="user">
     <div ref={rootRef} className="relative h-dvh w-full overflow-hidden select-none">
-      <CustomCursor />
+      <CustomCursor active={globeReady} />
       <Starfield />
 
-      {/* Subtle, static ambient glow to prevent GPU layout trashing */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
@@ -162,7 +149,6 @@ export default function GlobeExplorer() {
         }}
       />
 
-      {/* Oversized, offset globe — cropped like an editorial spread */}
       <div
         ref={globeWrapRef}
         className="absolute inset-0 opacity-0 transition-all duration-1000 ease-in-out"
@@ -186,7 +172,6 @@ export default function GlobeExplorer() {
 
       <div className="vignette-overlay" aria-hidden />
 
-      {/* Frame details */}
       <span className="chrome-fade pointer-events-none absolute top-[76px] left-6 z-10 hidden font-mono text-xs text-muted/40 md:block">
         +
       </span>
@@ -205,7 +190,6 @@ export default function GlobeExplorer() {
         </span>
       </div>
 
-      {/* Header: wordmark / nav / search */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between p-6 md:px-10 md:py-6">
         <span className="chrome-fade font-display pointer-events-auto text-sm font-bold tracking-[0.35em]">
           <ScrambleText text="NEWS" delay={600} /><span className="text-accent">X</span>
@@ -239,7 +223,6 @@ export default function GlobeExplorer() {
         </div>
       </header>
 
-      {/* Idle instruction — hides once a country is locked in */}
       <div
         ref={heroRef}
         className="pointer-events-none absolute bottom-24 left-6 z-10 opacity-0 md:bottom-28 md:left-10"
@@ -252,14 +235,10 @@ export default function GlobeExplorer() {
         </p>
       </div>
 
-      {/* Concise screen-reader announcement, separate from the visual panel
-          so assistive tech isn't forced to read the full chrome/HUD markup
-          every time the selection changes. */}
       <p className="sr-only" aria-live="polite">
         {selected ? `Now showing news for ${countryName(selected)}.` : ""}
       </p>
 
-      {/* Selected country — structured target panel */}
       <aside
         aria-label="Selected country details"
         className="pointer-events-none absolute inset-x-0 top-24 bottom-9 z-10 md:inset-x-auto md:top-20 md:right-12 md:bottom-10 md:w-[480px]"
@@ -338,7 +317,6 @@ export default function GlobeExplorer() {
         </AnimatePresence>
       </aside>
 
-      {/* Mission-control HUD bar */}
       <footer className="chrome-fade absolute inset-x-0 bottom-0 z-10 flex justify-between h-9 items-center gap-6 border-t border-border bg-background/40 px-4 font-mono text-[10px] tracking-[0.2em] text-muted uppercase backdrop-blur-md md:px-10">
         <UtcClock />
         <span suppressHydrationWarning className="whitespace-nowrap">
@@ -348,9 +326,6 @@ export default function GlobeExplorer() {
         </span>
       </footer>
 
-      {/* Article reader — one instance at the top level so it works whether
-          opened from a country's feed or from saved articles, and survives
-          country switches (the feed panel remounts per country). */}
       <ArticleReader
         article={openArticle}
         onOpenChange={(open) => {
