@@ -113,7 +113,7 @@ export default function GlobeCanvas({
     const highlight = new MeshBasicMaterial({
       color: 0xffd400,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.5,
       side: DoubleSide,
     });
     highlight.forceSinglePass = true;
@@ -299,7 +299,11 @@ export default function GlobeCanvas({
           forwardedRef={globeRef}
           width={size.width}
           height={size.height}
-          globeImageUrl="/textures/earth-night-8k.jpg"
+          globeImageUrl={
+            isMobile
+              ? "/textures/earth-day-4k.jpg"
+              : "/textures/earth-day-8k.jpg"
+          }
           bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
           globeMaterial={globeMaterial}
           backgroundColor="rgba(0,0,0,0)"
