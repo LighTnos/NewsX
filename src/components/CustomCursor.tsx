@@ -65,19 +65,52 @@ export default function CustomCursor({ active = true }: { active?: boolean }) {
   return (
     <>
       <motion.div
-        className="pointer-events-none fixed top-0 left-0 z-[9999] h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+        className="pointer-events-none fixed top-0 left-0 z-[9999] -translate-x-1/2 -translate-y-1/2"
         style={{ x: mouseX, y: mouseY, opacity: hasMoved ? 1 : 0 }}
-      />
+      >
+        <motion.div
+          className="h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
+          animate={{
+            backgroundColor: isHovering ? "#4c8dff" : "#ffffff",
+            boxShadow: isHovering
+              ? "0 0 10px 2px rgba(76,141,255,0.7)"
+              : "0 0 6px 0px rgba(255,255,255,0.8)",
+          }}
+        />
+      </motion.div>
       <motion.div
-        className="pointer-events-none fixed top-0 left-0 z-[9998] h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40"
+        className="pointer-events-none fixed top-0 left-0 z-[9998] h-9 w-9 -translate-x-1/2 -translate-y-1/2"
         style={{ x: springX, y: springY, opacity: hasMoved ? 1 : 0 }}
-        animate={{
-          scale: isHovering ? 1.6 : 1,
-          backgroundColor: isHovering ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0)",
-          borderColor: isHovering ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)"
-        }}
+        animate={{ scale: isHovering ? 1.5 : 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      />
+      >
+        <motion.div
+          className="absolute inset-0 rounded-full border"
+          animate={{
+            borderColor: isHovering
+              ? "rgba(76,141,255,0.8)"
+              : "rgba(255,255,255,0.55)",
+            backgroundColor: isHovering
+              ? "rgba(76,141,255,0.08)"
+              : "rgba(255,255,255,0)",
+          }}
+        />
+        <motion.div
+          className="absolute inset-0"
+          animate={{ rotate: 360 }}
+          transition={{ duration: isHovering ? 2.5 : 8, repeat: Infinity, ease: "linear" }}
+        >
+          <motion.span
+            className="absolute left-1/2 top-0 h-[5px] w-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            animate={{
+              backgroundColor: isHovering ? "#4c8dff" : "#9db8e8",
+              boxShadow: isHovering
+                ? "0 0 10px 3px rgba(76,141,255,0.6)"
+                : "0 0 6px 1px rgba(157,184,232,0.5)",
+            }}
+          />
+        </motion.div>
+      </motion.div>
     </>
   );
 }
